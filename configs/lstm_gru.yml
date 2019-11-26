@@ -1,0 +1,64 @@
+model_params:
+  model: patch_model_with_embedding
+  embedding_file: data/embeddings/glove_crawl_emb.pkl
+  params:
+    model: LSTM_GRU
+    embedding_size: 51839
+    embedding_dim: 600
+    hidden_lstm_size: 128
+    dropout_rate: 0.3
+    num_classes: 30
+
+stages:
+  state_params:
+    main_metric: spearman
+    minimize_metric: False
+
+  data_params:
+    num_workers: 6
+    batch_size: 64
+    train_pickle: data/train.pkl
+    valid_pickle: data/valid.pkl
+    seq_percentile: 85
+
+  criterion_params:
+    criterion: BCEWithLogitsLoss
+
+  callbacks_params:
+    loss:
+      callback: CriterionCallback
+
+    optim:
+      callback: OptimizerCallback
+
+    f1:
+      callback: F1Callback
+    spearman:
+      callback: SpearmanScoreCallback
+
+    saver:
+      callback: CheckpointCallback
+
+  stage1:
+    state_params:
+      num_epochs: 30
+
+    optimizer_params:
+      optimizer: RAdam
+      lr: 0.01
+
+  stage2:
+    state_params:
+      num_epochs: 20
+
+    optimizer_params:
+      optimizer: RAdam
+      lr: 0.001
+
+  finetune:
+    state_params:
+      num_epochs: 5
+
+    optimizer_params:
+      optimizer: RAdam
+      lr: 0.0005
