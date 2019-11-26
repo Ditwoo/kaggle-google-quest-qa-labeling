@@ -29,11 +29,18 @@ class TextDataset(Dataset):
 
 
 class FieldsDataset(Dataset):
-    def __init__(self, df: DataFrame, feature_cols: List[str], target: List[str], transforms: SeqTransformationInterface):
+    def __init__(self, 
+        df: DataFrame, 
+        feature_cols: List[str], 
+        target: List[str], 
+        transforms: SeqTransformationInterface, 
+        field: str = None
+    ):
         self.df: DataFrame = df
         self.features: List[str] = feature_cols
         self.target: List[str] = target
         self.augs: SeqTransformationInterface = transforms
+        self.field = field
 
     def __len__(self):
         return self.df.shape[0]
@@ -41,10 +48,10 @@ class FieldsDataset(Dataset):
     def __getitem__(self, idx):
         index = self.df.index[idx]
         state = {c: self.df.at[index, c] for c in self.features}
-        aug_state = self.augs.transform(state)
-        seq = aug_state["seq"]
+        state = self.augs.transform(state) if self.augs is not None else state
+        features = state[self.field] if self.field is not None else state
         target = [self.df.at[index, c] for c in self.target] 
-        return seq, target
+        return features, target
 
 
 class SequencesCollator:
@@ -64,10 +71,7 @@ class SequencesCollator:
 
     """
 
-    def __init__(self, 
-                 is_test: bool = False, 
-                 percentile: int = 100, 
-                 max_len: int = 1_000):
+    def __init__(self, is_test: bool = False, percentile: int = 100, max_len: int = 1_000):
         self.is_test = is_test
         self.percentile = percentile
         self.max_len = max_len
@@ -88,3 +92,33 @@ class SequencesCollator:
         else:
             labels = torch.FloatTensor(labels)
             return sequences, labels
+
+
+class FieldsCollator:
+    def __init__(self, fields: list, is_test: bool = False, percentile: int = 100, max_len: int = 500):
+        self.fields = fields
+        self.is_test = is_test
+        self.percentile = percentile
+        self.max_len = max_len
+
+    def __call__(self, batch):
+        if self.is_test:
+            sequences = batch
+        else:
+            sequences, labels = zip(*batch)
+
+        res = {}
+        for f in self.fields:
+            seq = [item[f] for item in sequences]
+            lengths = np.array(list(map(len, seq)))
+            max_len = int(np.percentile(lengths, self.percentile))
+            max_len = min(int(np.percentile(lengths, self.percentile)), self.max_len)
+            seq = torch.from_numpy(pad_sequences(seq, max_len))
+            seq = seq.long()
+            res[f] = seq
+
+        if self.is_test:
+            return res
+        else:
+            res["targets"] = torch.FloatTensor(labels)
+            return res

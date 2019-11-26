@@ -1,10 +1,11 @@
 from catalyst.dl import registry
-from catalyst.dl import SupervisedRunner as Runner
+from .runner import Runner
 
 # from .optimizers import RAdam
 from .models import (
     LinearModel,
     LSTM_GRU,
+    MultiInputLstm,
     patch_model_with_embedding,
     model_from_checkpoint,
 )
@@ -20,6 +21,7 @@ from .experiment import Experiment
 
 registry.Model(LinearModel)
 registry.Model(LSTM_GRU)
+registry.Model(MultiInputLstm)
 registry.Model(patch_model_with_embedding)
 registry.Model(model_from_checkpoint)
 

@@ -6,7 +6,7 @@ import scipy.sparse as sp
 from catalyst.dl import ConfigExperiment
 from sklearn.model_selection import train_test_split
 
-from .datasets import FieldsDataset, SequencesCollator
+from .datasets import FieldsDataset, SequencesCollator, FieldsCollator
 from .datasets.augmentations import CombineSeqs, SeqElementsShuffler, Compose
 # from .datasets import VectorDataset
 
@@ -66,15 +66,15 @@ class Experiment(ConfigExperiment):
                 SeqElementsShuffler("question_title", p=0.3),
                 SeqElementsShuffler("question_body", p=0.3),
                 SeqElementsShuffler("answer", p=0.3),
-                CombineSeqs(text_cols, "seq", glue_token=0),
             )
         else:
-            augs = CombineSeqs(text_cols, "seq", glue_token=0)
+            augs = None
+            # augs = CombineSeqs(text_cols, "seq", glue_token=0)
 
         datasets = OrderedDict()
         datasets["train"] = dict(
             dataset=FieldsDataset(df, text_cols, targets, augs),
-            collate_fn=SequencesCollator(max_len=max_len, percentile=seq_percentile),
+            collate_fn=FieldsCollator(text_cols, max_len=max_len, percentile=seq_percentile),
         )
 
         with open(valid_pickle, "rb") as f:
@@ -85,7 +85,8 @@ class Experiment(ConfigExperiment):
         print(f"Valid max len - {max_len}", flush=True)
 
         datasets["valid"] = dict(
-            dataset=FieldsDataset(df, text_cols, targets, CombineSeqs(text_cols, "seq", glue_token=0)),
-            collate_fn=SequencesCollator(max_len=max_len, percentile=seq_percentile),
+            # dataset=FieldsDataset(df, text_cols, targets, CombineSeqs(text_cols, "seq", glue_token=0)),
+            dataset=FieldsDataset(df, text_cols, targets, None),
+            collate_fn=FieldsCollator(text_cols, max_len=max_len, percentile=seq_percentile),
         )
         return datasets

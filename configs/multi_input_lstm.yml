@@ -2,7 +2,7 @@ model_params:
   model: patch_model_with_embedding
   embedding_file: data/embeddings/glove_crawl_emb.pkl
   params:
-    model: LSTM_GRU
+    model: MultiInputLstm
     embedding_size: 48685
     embedding_dim: 600
     hidden_lstm_size: 128
@@ -10,13 +10,13 @@ model_params:
     num_classes: 30
 
 stages:
-  # state_params:
-    # main_metric: spearman
-    # minimize_metric: False
+  state_params:
+    main_metric: spearman
+    minimize_metric: False
 
   data_params:
     num_workers: 12
-    batch_size: 34
+    batch_size: 32
     train_pickle: data/train.pkl
     valid_pickle: data/valid.pkl
     seq_percentile: 95
@@ -24,21 +24,22 @@ stages:
   criterion_params:
     criterion: BCEWithLogitsLoss
   
-  scheduler_params:
-    scheduler: ReduceLROnPlateau
-    factor: 0.2
-    patience: 3
-    verbose: True
+  # scheduler_params:
+  #   scheduler: ReduceLROnPlateau
+  #   factor: 0.2
+  #   patience: 3
+  #   verbose: True
 
   callbacks_params:
     loss:
       callback: CriterionCallback
+      input_key: targets
 
     optim:
       callback: OptimizerCallback
 
-    scheduler:
-      callback: SchedulerCallback
+    # scheduler:
+    #   callback: SchedulerCallback
 
     spearman:
       callback: SpearmanScoreCallback
