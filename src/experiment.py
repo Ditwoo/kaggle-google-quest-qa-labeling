@@ -20,7 +20,7 @@ class Experiment(ConfigExperiment):
         seq_percentile: int = 75,
         **kwargs,
     ):  
-        text_cols = ["question_title", "question_body", "answer"]
+        text_cols = ["question_title", "question_body", "answer", "category", "host"]
         targets = [
             "question_asker_intent_understanding", 
             "question_body_critical",
@@ -74,7 +74,12 @@ class Experiment(ConfigExperiment):
         datasets = OrderedDict()
         datasets["train"] = dict(
             dataset=FieldsDataset(df, text_cols, targets, augs),
-            collate_fn=FieldsCollator(text_cols, max_len=max_len, percentile=seq_percentile),
+            collate_fn=FieldsCollator(
+                fields=text_cols,
+                ignore_fields=["category", "host"],
+                max_len=max_len, 
+                percentile=seq_percentile
+            ),
         )
 
         with open(valid_pickle, "rb") as f:
@@ -87,6 +92,11 @@ class Experiment(ConfigExperiment):
         datasets["valid"] = dict(
             # dataset=FieldsDataset(df, text_cols, targets, CombineSeqs(text_cols, "seq", glue_token=0)),
             dataset=FieldsDataset(df, text_cols, targets, None),
-            collate_fn=FieldsCollator(text_cols, max_len=max_len, percentile=seq_percentile),
+            collate_fn=FieldsCollator(
+                fields=text_cols, 
+                ignore_fields=["category", "host"],
+                max_len=max_len, 
+                percentile=seq_percentile
+            ),
         )
         return datasets

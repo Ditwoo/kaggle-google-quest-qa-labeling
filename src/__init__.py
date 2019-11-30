@@ -6,6 +6,8 @@ from .models import (
     LinearModel,
     LSTM_GRU,
     MultiInputLstm,
+    MultiInputLstmGru,
+    MultiInputLstmGruAttention,
     patch_model_with_embedding,
     model_from_checkpoint,
 )
@@ -22,6 +24,8 @@ from .experiment import Experiment
 registry.Model(LinearModel)
 registry.Model(LSTM_GRU)
 registry.Model(MultiInputLstm)
+registry.Model(MultiInputLstmGru)
+registry.Model(MultiInputLstmGruAttention)
 registry.Model(patch_model_with_embedding)
 registry.Model(model_from_checkpoint)
 

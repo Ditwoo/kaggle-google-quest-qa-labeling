@@ -2,10 +2,15 @@ model_params:
   model: patch_model_with_embedding
   embedding_file: data/embeddings/glove_crawl_emb.pkl
   params:
-    model: MultiInputLstm
+    model: MultiInputLstmGru
     embedding_size: 60668
     embedding_dim: 600
-    hidden_lstm_size: 128
+    category_embedding_size: 5
+    category_embedding_dim: 16
+    host_embedding_size: 64
+    host_embedding_dim: 32
+    hidden_size: 128
+    out_rnn_size: 128
     dropout_rate: 0.3
     num_classes: 30
 

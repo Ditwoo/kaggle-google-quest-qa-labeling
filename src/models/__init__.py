@@ -5,7 +5,7 @@ from catalyst.dl import registry
 
 from .vector import LinearModel
 from .lstm_gru import LSTM_GRU
-from .multi_input import MultiInputLstm
+from .multi_input import MultiInputLstm, MultiInputLstmGru, MultiInputLstmGruAttention
 
 
 def patch_model_with_embedding(embedding_file: str, params: dict) -> torch.nn.Module:

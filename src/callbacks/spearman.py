@@ -1,21 +1,14 @@
+import numpy as np
 import torch
+from scipy.stats import spearmanr
 from catalyst.dl.core import Callback, CallbackOrder, RunnerState
 
 
-def spearman(input, target, eps: float = 1e-7) -> float:
-    n = input.size(0)
-    input_mean = input.mean(dim=0, keepdim=True)
-    target_mean = target.mean(dim=0, keepdim=True)
-    input_std = input.std(dim=0)
-    target_std = target.std(dim=0)
-    # deal with the degenerate case when some variances are zero
-    # this happens when some input or target columns are constant
-    input_std = torch.clamp(input_std, eps)
-    target_std = torch.clamp(target_std, eps)
-    cov = ((input - input_mean) * (target - target_mean)).mean(dim=0)
-    cov = cov * (n / (n - 1))   # Bessel's correction
-    corr = cov / (input_std * target_std)
-    return corr.mean()
+def spearman(input, target, classes: list) -> float:
+    score = 0.0
+    for c in classes:
+        score += np.nan_to_num(spearmanr(target[:, c], input[:, c]).correlation) / len(classes)
+    return score
 
 
 class SpearmanScoreCallback(Callback):
@@ -23,6 +16,7 @@ class SpearmanScoreCallback(Callback):
                  prefix: str = "spearman",
                  input_key: str = "targets",
                  output_key: str = "logits",
+                 classes: list = [0],
                  eps: float = 1e-7,
                  **metric_params):
         super().__init__(CallbackOrder.Metric)
@@ -32,13 +26,35 @@ class SpearmanScoreCallback(Callback):
         self.output_key: str = output_key
         self.eps = eps
         self.metric_params = metric_params
+        self.classes = classes
+        self._reset()
+
+    def _reset(self):
+        self.targets = None
+        self.outputs = None
 
     def on_batch_end(self, state: RunnerState) -> None:
+        # store batch predictions and targets
         outputs = torch.sigmoid(state.output[self.output_key])
+        outputs = outputs.detach().cpu().numpy()
+        if self.outputs is None:
+            self.outputs = []
+        self.outputs.append(outputs)
+
         targets = state.input[self.input_key]
-        score = spearman(outputs, targets, self.eps)
-        state.metrics.add_batch_value(
-            metrics_dict={f"{self.prefix}": score}
+        targets = targets.detach().cpu().numpy()
+        if self.targets is None:
+            self.targets = []
+        self.targets.append(targets)
+
+    def on_loader_end(self, state: RunnerState) -> None:
+        # compute score based on data from whole loader
+        spearman_score = spearman(
+            np.vstack(self.outputs), 
+            np.vstack(self.targets),
+            self.classes
         )
+        state.metrics.epoch_values[state.loader_name][f"{self.prefix}"] = spearman_score
+        self._reset()
 
 __all__ = ("SpearmanScoreCallback", )

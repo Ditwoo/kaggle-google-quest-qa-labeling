@@ -2,10 +2,15 @@ model_params:
   model: patch_model_with_embedding
   embedding_file: data/embeddings/glove_crawl_emb.pkl
   params:
-    model: MultiInputLstm
+    model: MultiInputLstmGruAttention
     embedding_size: 60668
     embedding_dim: 600
-    hidden_lstm_size: 128
+    category_embedding_size: 5
+    category_embedding_dim: 16
+    host_embedding_size: 64
+    host_embedding_dim: 32
+    hidden_size: 128
+    out_rnn_size: 128
     dropout_rate: 0.3
     num_classes: 30
 
@@ -19,7 +24,7 @@ stages:
     batch_size: 32
     train_pickle: data/train.pkl
     valid_pickle: data/valid.pkl
-    seq_percentile: 95
+    seq_percentile: 80
 
   criterion_params:
     criterion: BCEWithLogitsLoss
@@ -54,7 +59,7 @@ stages:
 
   stage1:
     state_params:
-      num_epochs: 30
+      num_epochs: 20
 
     optimizer_params:
       optimizer: RAdam
@@ -62,7 +67,7 @@ stages:
 
   stage2:
     state_params:
-      num_epochs: 20
+      num_epochs: 30
 
     optimizer_params:
       optimizer: RAdam
@@ -70,7 +75,7 @@ stages:
 
   finetune:
     state_params:
-      num_epochs: 5
+      num_epochs: 10
 
     optimizer_params:
       optimizer: RAdam

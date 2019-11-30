@@ -71,7 +71,10 @@ class SequencesCollator:
 
     """
 
-    def __init__(self, is_test: bool = False, percentile: int = 100, max_len: int = 1_000):
+    def __init__(self, 
+                 is_test: bool = False, 
+                 percentile: int = 100, 
+                 max_len: int = 1_000):
         self.is_test = is_test
         self.percentile = percentile
         self.max_len = max_len
@@ -95,8 +98,15 @@ class SequencesCollator:
 
 
 class FieldsCollator:
-    def __init__(self, fields: list, is_test: bool = False, percentile: int = 100, max_len: int = 500):
+    def __init__(self, 
+                 fields: list,
+                 ignore_fields: list = None,
+                 is_test: bool = False, 
+                 percentile: int = 100, 
+                 max_len: int = 500):
         self.fields = fields
+        ignore_fields = {} if not ignore_fields else set(ignore_fields)
+        self.ignore_fields = ignore_fields
         self.is_test = is_test
         self.percentile = percentile
         self.max_len = max_len
@@ -112,7 +122,8 @@ class FieldsCollator:
             seq = [item[f] for item in sequences]
             lengths = np.array(list(map(len, seq)))
             max_len = int(np.percentile(lengths, self.percentile))
-            max_len = min(int(np.percentile(lengths, self.percentile)), self.max_len)
+            if f not in self.ignore_fields:
+                max_len = min(int(np.percentile(lengths, self.percentile)), self.max_len)
             seq = torch.from_numpy(pad_sequences(seq, max_len))
             seq = seq.long()
             res[f] = seq
