@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from scipy.stats import spearmanr
 from catalyst.dl.core import Callback, CallbackOrder, RunnerState
+from typing import Union, List
 
 
 def spearman(input, target, classes: list) -> float:
@@ -16,7 +17,7 @@ class SpearmanScoreCallback(Callback):
                  prefix: str = "spearman",
                  input_key: str = "targets",
                  output_key: str = "logits",
-                 classes: list = [0],
+                 classes: Union[int, List[int]] = [0],
                  eps: float = 1e-7,
                  **metric_params):
         super().__init__(CallbackOrder.Metric)
@@ -26,6 +27,8 @@ class SpearmanScoreCallback(Callback):
         self.output_key: str = output_key
         self.eps = eps
         self.metric_params = metric_params
+        if isinstance(classes, int):
+            classes = list(range(classes))
         self.classes = classes
         self._reset()
 

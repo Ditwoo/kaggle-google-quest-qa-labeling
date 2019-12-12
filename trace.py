@@ -30,9 +30,9 @@ def main():
     model.eval()
 
     example_input = (
-        torch.randint(high=1, size=(1, 25)).to(device),
-        torch.randint(high=1, size=(1, 100)).to(device),
-        torch.randint(high=1, size=(1, 50)).to(device),
+        torch.randint(low=0, high=10, size=(1, 25)).to(device),
+        torch.randint(low=0, high=10, size=(1, 100)).to(device),
+        torch.randint(low=0, high=10, size=(1, 50)).to(device),
         torch.randint(high=1, size=(1, 1)).to(device),
         torch.randint(high=1, size=(1, 1)).to(device),
     )

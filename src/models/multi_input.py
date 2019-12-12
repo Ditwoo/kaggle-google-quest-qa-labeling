@@ -172,7 +172,7 @@ class MultiInputLstmGruAttention(nn.Module):
         self.question_lstm = LSTM_GRU_Attention_Pool(embedding_dim, hidden_size, out_rnn_size)
         self.answer_lstm = LSTM_GRU_Attention_Pool(embedding_dim, hidden_size, out_rnn_size)
         
-        input_size = 3*(2*(2*hidden_size + 2*out_rnn_size + 2*out_rnn_size)) + category_embedding_dim + host_embedding_dim
+        input_size = 3*(2*(2*hidden_size + 2*out_rnn_size + hidden_size + out_rnn_size)) + category_embedding_dim + host_embedding_dim
         self.head = nn.Sequential(
             OrderedDict(
                 [
@@ -200,28 +200,26 @@ class MultiInputLstmGruAttention(nn.Module):
         )
 
     def forward(self, question_title, question_body, answer, category, host):
-        
+
+        title_mask = (question_title > 0).float()
         title = self.embedding(question_title)
         title = self.embedding_dropout(title)
+        title = self.title_lstm(title, title_mask)
 
-        title = self.title_lstm(title)
-
+        question_mask = (question_body > 0).float()
         question = self.embedding(question_body)
         question = self.embedding_dropout(question)
+        question = self.question_lstm(question, question_mask)
 
-        question = self.question_lstm(question)
-
+        answer_mask = (answer > 0).float()
         answer = self.embedding(answer)
         answer = self.embedding_dropout(answer)
-
-        answer = self.answer_lstm(answer)
+        answer = self.answer_lstm(answer, answer_mask)
 
         category = self.category_embedding(category).squeeze(1)
         host = self.host_embedding(host).squeeze(1)
 
         x = torch.cat([title, question, answer, category, host], 1)
-
-        # import pdb; pdb.set_trace()
 
         x = self.head(x)
 

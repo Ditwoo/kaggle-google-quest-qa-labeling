@@ -30,12 +30,11 @@ class TextDataset(Dataset):
 
 class FieldsDataset(Dataset):
     def __init__(self, 
-        df: DataFrame, 
-        feature_cols: List[str], 
-        target: List[str], 
-        transforms: SeqTransformationInterface, 
-        field: str = None
-    ):
+                 df: DataFrame, 
+                 feature_cols: List[str], 
+                 target: List[str], 
+                 transforms: SeqTransformationInterface, 
+                 field: str = None):
         self.df: DataFrame = df
         self.features: List[str] = feature_cols
         self.target: List[str] = target
@@ -124,7 +123,7 @@ class FieldsCollator:
             max_len = int(np.percentile(lengths, self.percentile))
             if f not in self.ignore_fields:
                 max_len = min(int(np.percentile(lengths, self.percentile)), self.max_len)
-            seq = torch.from_numpy(pad_sequences(seq, max_len))
+            seq = torch.from_numpy(pad_sequences(seq, max_len, padding='post'))
             seq = seq.long()
             res[f] = seq
 

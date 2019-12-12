@@ -8,8 +8,11 @@ from .models import (
     MultiInputLstm,
     MultiInputLstmGru,
     MultiInputLstmGruAttention,
+    TransfModel,
+    MultipleInputTransfModel,
     patch_model_with_embedding,
     model_from_checkpoint,
+    unfreezed_transf,
 )
 from .callbacks import (
     PrecisionCallback,
@@ -26,8 +29,12 @@ registry.Model(LSTM_GRU)
 registry.Model(MultiInputLstm)
 registry.Model(MultiInputLstmGru)
 registry.Model(MultiInputLstmGruAttention)
+registry.Model(TransfModel)
+registry.Model(MultipleInputTransfModel)
+# functions
 registry.Model(patch_model_with_embedding)
 registry.Model(model_from_checkpoint)
+registry.Model(unfreezed_transf)
 
 registry.Callback(PrecisionCallback)
 registry.Callback(RecallCallback)

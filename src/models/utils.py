@@ -1,5 +1,42 @@
+import numpy as np
 import torch
 import torch.nn as nn
+from catalyst.dl import registry
+
+
+def patch_model_with_embedding(embedding_file: str, params: dict) -> nn.Module:
+    embedding = np.load(embedding_file, allow_pickle=True)
+
+    model = registry.MODELS.get_from_params(**params)
+    model.embedding.weight = nn.Parameter(torch.tensor(embedding, dtype=torch.float))
+    model.embedding.requires_grad = False
+    
+    return model
+
+
+def model_from_checkpoint(checkpoint: str, params: dict) -> nn.Module:
+    model = registry.MODELS.get_from_params(**params)
+
+    checkpoint = torch.load(checkpoint)
+    model.load_state_dict(checkpoint["model_state_dict"])
+
+    return model
+
+
+def unfreezed_transf(checkpoint: str, params: dict) -> nn.Module:
+    model = model_from_checkpoint(checkpoint, params)
+    require_grads(model.bert)
+    return model
+
+
+def do_not_require_grads(model: nn.Module):
+    for param in model.parameters():
+        param.requires_grad = False
+
+
+def require_grads(model: nn.Module):
+    for param in model.parameters():
+        param.requires_grad = True
 
 
 class EmbeddingDropout(nn.Dropout2d):
@@ -87,6 +124,9 @@ class LSTM_GRU_Attention_Pool(nn.Module):
             batch_first=True,
             bidirectional=True,
         )
+        self.lstm_attn = BiaslessAttention(
+            feature_dim=2 * hidden_size
+        )
         self.gru = nn.GRU(
             input_size=2 * hidden_size,
             hidden_size=output_size,
@@ -94,22 +134,23 @@ class LSTM_GRU_Attention_Pool(nn.Module):
             batch_first=True,
             bidirectional=True,
         )
-        self.attn = BiaslessAttention(
+        self.gru_attn = BiaslessAttention(
             feature_dim=2 * output_size
         )
 
-    def forward(self, x):
+    def forward(self, x, mask=None):
+        
         self.lstm.flatten_parameters()
         x_lstm, _ = self.lstm(x)
+        x_lstm_attn = self.lstm_attn(x_lstm, mask)
 
         self.gru.flatten_parameters()
         x_gru, _ = self.gru(x_lstm)
-
-        x_attn = self.attn(x_gru)
+        x_gru_attn = self.gru_attn(x_gru, mask)
 
         x = torch.cat([
-            torch.max(x_lstm, 1)[0], torch.max(x_gru, 1)[0], x_attn,
-            torch.mean(x_lstm, 1), torch.mean(x_gru, 1), x_attn,
+            torch.max(x_lstm, 1)[0], torch.max(x_gru, 1)[0], x_lstm_attn,
+            torch.mean(x_lstm, 1), torch.mean(x_gru, 1), x_gru_attn,
         ], 1)
 
         return x
@@ -181,6 +222,7 @@ class BiaslessAttention(nn.Module):
         a = torch.exp(eij)
 
         if mask is not None:
+            # mask should have shapes B*S
             a = a * mask
 
         a = a / torch.sum(a, 1, keepdim=True) + 1e-10

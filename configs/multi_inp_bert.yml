@@ -1,0 +1,59 @@
+model_params:
+  model: MultipleInputTransfModel
+  pretrain_dir: bert-base-uncased
+  num_classes: 30
+
+stages:
+  state_params:
+    main_metric: spearman
+    minimize_metric: False
+
+  data_params:
+    num_workers: 12
+    batch_size: 32
+    train_pickle: data/trans_train.pkl
+    valid_pickle: data/trans_valid.pkl
+    transformer_dir: data/uncased_L-12_H-768_A-12
+
+  criterion_params:
+    criterion: BCEWithLogitsLoss
+
+  callbacks_params:
+    loss:
+      callback: CriterionCallback
+      input_key: targets
+
+    optim:
+      callback: OptimizerCallback
+      # accumulation_steps: 4
+
+    spearman:
+      callback: SpearmanScoreCallback
+      classes: 30
+
+    saver:
+      callback: CheckpointCallback
+
+  stage1:
+    state_params:
+      num_epochs: 10
+    
+    optimizer_params:
+      optimizer: RAdam
+      lr: 0.001
+
+  stage2:
+    state_params:
+      num_epochs: 10
+    
+    optimizer_params:
+      optimizer: RAdam
+      lr: 0.0005
+
+  stage3:
+    state_params:
+      num_epochs: 10
+    
+    optimizer_params:
+      optimizer: RAdam
+      lr: 0.0001

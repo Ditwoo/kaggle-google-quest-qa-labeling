@@ -6,8 +6,19 @@ import scipy.sparse as sp
 from catalyst.dl import ConfigExperiment
 from sklearn.model_selection import train_test_split
 
-from .datasets import FieldsDataset, SequencesCollator, FieldsCollator
-from .datasets.augmentations import CombineSeqs, SeqElementsShuffler, Compose
+from .datasets import (
+    FieldsDataset, 
+    SequencesCollator, 
+    FieldsCollator,
+    TransformerFieldsDataset,
+    TransformersCollator,
+    TransformerMultipleFieldsDataset
+)
+from .datasets.augmentations import (
+    CombineSeqs, 
+    SeqElementsShuffler, 
+    Compose
+)
 # from .datasets import VectorDataset
 
 
@@ -17,7 +28,8 @@ class Experiment(ConfigExperiment):
         stage: str,
         train_pickle: str,
         valid_pickle: str,
-        seq_percentile: int = 75,
+        # seq_percentile: int = 75,
+        transformer_dir: str,
         **kwargs,
     ):  
         text_cols = ["question_title", "question_body", "answer", "category", "host"]
@@ -61,25 +73,31 @@ class Experiment(ConfigExperiment):
         print(f"Train size - {df.shape[0]}")
         print(f"Train max len - {max_len}", flush=True)
 
-        if stage != "finetune":
-            augs = Compose(
-                SeqElementsShuffler("question_title", p=0.3),
-                SeqElementsShuffler("question_body", p=0.3),
-                SeqElementsShuffler("answer", p=0.3),
-            )
-        else:
-            augs = None
-            # augs = CombineSeqs(text_cols, "seq", glue_token=0)
+        # if stage != "finetune":
+        #     augs = Compose(
+        #         SeqElementsShuffler("question_title", p=0.3),
+        #         SeqElementsShuffler("question_body", p=0.3),
+        #         SeqElementsShuffler("answer", p=0.3),
+        #     )
+        # else:
+        #     augs = None
+        #     # augs = CombineSeqs(text_cols, "seq", glue_token=0)
 
         datasets = OrderedDict()
+        # datasets["train"] = dict(
+        #     dataset=FieldsDataset(df, text_cols, targets, augs),
+        #     collate_fn=FieldsCollator(
+        #         fields=text_cols,
+        #         ignore_fields=["category", "host"],
+        #         max_len=max_len, 
+        #         percentile=seq_percentile
+        #     ),
+        #     shuffle=True,
+        # )
         datasets["train"] = dict(
-            dataset=FieldsDataset(df, text_cols, targets, augs),
-            collate_fn=FieldsCollator(
-                fields=text_cols,
-                ignore_fields=["category", "host"],
-                max_len=max_len, 
-                percentile=seq_percentile
-            ),
+            dataset=TransformerMultipleFieldsDataset(df, targets, transformer_dir),
+            # collate_fn=TransformersCollator(is_test=False),
+            shuffle=True,
         )
 
         with open(valid_pickle, "rb") as f:
@@ -89,14 +107,20 @@ class Experiment(ConfigExperiment):
         print(f"Valid size - {df.shape[0]}")
         print(f"Valid max len - {max_len}", flush=True)
 
+        # datasets["valid"] = dict(
+        #     # dataset=FieldsDataset(df, text_cols, targets, CombineSeqs(text_cols, "seq", glue_token=0)),
+        #     dataset=FieldsDataset(df, text_cols, targets, None),
+        #     collate_fn=FieldsCollator(
+        #         fields=text_cols, 
+        #         ignore_fields=["category", "host"],
+        #         max_len=max_len, 
+        #         percentile=seq_percentile
+        #     ),
+        # )
+
         datasets["valid"] = dict(
-            # dataset=FieldsDataset(df, text_cols, targets, CombineSeqs(text_cols, "seq", glue_token=0)),
-            dataset=FieldsDataset(df, text_cols, targets, None),
-            collate_fn=FieldsCollator(
-                fields=text_cols, 
-                ignore_fields=["category", "host"],
-                max_len=max_len, 
-                percentile=seq_percentile
-            ),
+            dataset=TransformerMultipleFieldsDataset(df, targets, transformer_dir),
+            # collate_fn=TransformersCollator(is_test=False),
+            shuffle=False,
         )
         return datasets
