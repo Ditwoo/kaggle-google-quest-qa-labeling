@@ -3,9 +3,8 @@
 
 1. Multitarget stratification (see more in [`iterstat`](https://github.com/trent-b/iterative-stratification)) vs [KFold](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.KFold.html)
 
-2. Ensemble of models
-
-__15 December 2019__ Works, even with worth dataset.
+2. Ensemble of models [-] <br>
+__15 December 2019__: Works, even with worth dataset.
 
 3. Ensemble of models for each field
 
