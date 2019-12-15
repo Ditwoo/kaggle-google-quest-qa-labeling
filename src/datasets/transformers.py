@@ -1,3 +1,4 @@
+from math import floor, ceil
 import numpy as np
 import torch
 from pandas import DataFrame
@@ -25,6 +26,7 @@ class TransformerFieldsDataset(Dataset):
         self.field = field
         self.train_mode = train_mode
         self.tokenizer: BertTokenizer = BertTokenizer.from_pretrained(tokenizer_dir)
+        self.PAD = self.tokenizer.vocab["[PAD]"]  # or 0 token
 
     def __len__(self):
         return self.df.shape[0]
@@ -37,7 +39,19 @@ class TransformerFieldsDataset(Dataset):
             remove_start = np.random.randint(0, len(tokens) - num_remove - 1)
             return tokens[:remove_start] + tokens[remove_start + num_remove:]
         else:
-            return tokens[:max_num//2] + tokens[-(max_num - max_num//2):]
+            return tokens[:max_num // 2] + tokens[-(max_num - max_num // 2):]
+
+    def _build_tokens(self, title, question, answer):
+        title_body = self._select_tokens(
+            self.tokenizer.tokenize(title + "," + question), 
+            max_num=MAX_QUESTION_LEN
+        )
+        ans = self._select_tokens(
+            self.tokenizer.tokenize(answer), 
+            max_num=MAX_ANSWER_LEN
+        )
+        tokens = ["[CLS]"] + title_body + ["[SEP]"] + ans + ["[SEP]"]
+        return tokens
 
     def __getitem__(self, idx):
         index = self.df.index[idx]
@@ -45,15 +59,10 @@ class TransformerFieldsDataset(Dataset):
         body = self.df.at[index, "question_body"]
         answer = self.df.at[index, "answer"]
 
-        # import pdb; pdb.set_trace()
-
-        tokens = ["[CLS]"] + self._select_tokens(self.tokenizer.tokenize(title + "," + body), MAX_QUESTION_LEN) + \
-                 ["[SEP]"] + self._select_tokens(self.tokenizer.tokenize(answer), MAX_ANSWER_LEN) + \
-                 ["[SEP]"]
-
+        tokens = self._build_tokens(title, body, answer)
         token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
         if len(token_ids) < MAX_LEN:
-            token_ids += [0] * (MAX_LEN - len(token_ids))
+            token_ids += [self.PAD] * (MAX_LEN - len(token_ids))
         
         token_ids = torch.LongTensor(token_ids)
         target = [self.df.at[index, c] for c in self.target] 

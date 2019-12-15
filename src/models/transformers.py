@@ -3,6 +3,7 @@ import torch.nn as nn
 from transformers import AutoConfig, AutoModel
 from .utils import do_not_require_grads
 
+
 class TransfModel(nn.Module):
     def __init__(self,
                  pretrain_dir: str,
@@ -18,7 +19,7 @@ class TransfModel(nn.Module):
             pretrain_dir, 
             config=config
         )
-        do_not_require_grads(self.bert)  # freeze bert parameters
+        # do_not_require_grads(self.bert)  # freeze bert parameters
 
         self.pre_classifier = nn.Linear(config.hidden_size, config.hidden_size)
         self.classifier = nn.Sequential(

@@ -1,3 +1,4 @@
+import os
 import pickle
 from collections import OrderedDict
 
@@ -23,15 +24,13 @@ from .datasets.augmentations import (
 
 
 class Experiment(ConfigExperiment):
-    def get_datasets(
-        self,
-        stage: str,
-        train_pickle: str,
-        valid_pickle: str,
-        # seq_percentile: int = 75,
-        transformer_dir: str,
-        **kwargs,
-    ):  
+    def get_datasets(self,
+                     stage: str,
+                     # seq_percentile: int = 75,
+                     transformer_dir: str,
+                     train_pickle: str = None,
+                     valid_pickle: str = None,
+                     **kwargs):  
         text_cols = ["question_title", "question_body", "answer", "category", "host"]
         targets = [
             "question_asker_intent_understanding", 
@@ -66,6 +65,11 @@ class Experiment(ConfigExperiment):
             "answer_well_written",
         ]
         
+        # import pdb; pdb.set_trace()
+
+        if "TRAIN_PICKLE" in os.environ and os.environ["TRAIN_PICKLE"]:
+            train_pickle = os.environ["TRAIN_PICKLE"]
+
         with open(train_pickle, "rb") as f:
             df = pickle.load(f)
 
@@ -95,10 +99,13 @@ class Experiment(ConfigExperiment):
         #     shuffle=True,
         # )
         datasets["train"] = dict(
-            dataset=TransformerMultipleFieldsDataset(df, targets, transformer_dir),
+            dataset=TransformerFieldsDataset(df, targets, transformer_dir),
             # collate_fn=TransformersCollator(is_test=False),
             shuffle=True,
         )
+        
+        if "VALID_PICKLE" in os.environ and os.environ["VALID_PICKLE"]:
+            valid_pickle = os.environ["VALID_PICKLE"]
 
         with open(valid_pickle, "rb") as f:
             df = pickle.load(f)
@@ -119,7 +126,7 @@ class Experiment(ConfigExperiment):
         # )
 
         datasets["valid"] = dict(
-            dataset=TransformerMultipleFieldsDataset(df, targets, transformer_dir),
+            dataset=TransformerFieldsDataset(df, targets, transformer_dir, train_mode=False),
             # collate_fn=TransformersCollator(is_test=False),
             shuffle=False,
         )
