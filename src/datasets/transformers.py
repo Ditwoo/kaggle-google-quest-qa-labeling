@@ -53,6 +53,20 @@ class TransformerFieldsDataset(Dataset):
         tokens = ["[CLS]"] + title_body + ["[SEP]"] + ans + ["[SEP]"]
         return tokens
 
+    def _build_segments(self, tokens):
+        segments = []
+        # first_sep = True
+        current_segment_id = 0
+        for token in tokens:
+            segments.append(current_segment_id)
+            if token == "[SEP]":
+                current_segment_id = 1
+                # if first_sep:
+                #     first_sep = False 
+                # else:
+                #     current_segment_id = 1
+        return segments
+
     def __getitem__(self, idx):
         index = self.df.index[idx]
         title = self.df.at[index, "question_title"]
@@ -60,14 +74,18 @@ class TransformerFieldsDataset(Dataset):
         answer = self.df.at[index, "answer"]
 
         tokens = self._build_tokens(title, body, answer)
+        segments = self._build_segments(tokens)
         token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
         if len(token_ids) < MAX_LEN:
             token_ids += [self.PAD] * (MAX_LEN - len(token_ids))
+        if len(segments) < MAX_LEN:
+            segments += [self.PAD] * (MAX_LEN - len(segments))
         
         token_ids = torch.LongTensor(token_ids)
+        segments = torch.LongTensor(segments)
         target = [self.df.at[index, c] for c in self.target] 
         target = torch.FloatTensor(target)
-        return token_ids, target
+        return {"sequences": token_ids, "segments": segments, "targets": target}
 
 
 class TransformerMultipleFieldsDataset(Dataset):

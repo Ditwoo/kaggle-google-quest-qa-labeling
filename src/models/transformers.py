@@ -28,11 +28,12 @@ class TransfModel(nn.Module):
             nn.Linear(config.hidden_size, num_classes)
         )
 
-    def forward(self, sequences, head_mask=None):
+    def forward(self, sequences, segments=None, head_mask=None):
         mask = (sequences > 0).float()
         bert_output = self.bert(
             input_ids=sequences,
             attention_mask=mask,
+            token_type_ids=segments,
             head_mask=head_mask
         )
         # we only need the hidden state here and don't need
@@ -42,8 +43,53 @@ class TransfModel(nn.Module):
         pooled_output = hidden_state[:, 0]  # (bs, dim)
         pooled_output = self.pre_classifier(pooled_output)  # (bs, dim)
         logits = self.classifier(pooled_output)  # (bs, dim)
-
         return logits
+
+
+class PooledTransfModel(nn.Module):
+    def __init__(self,
+                 pretrain_dir: str,
+                 num_classes: int = 1):
+        super(PooledTransfModel, self).__init__()
+
+        config = AutoConfig.from_pretrained(
+            pretrain_dir, 
+            num_labels=num_classes
+        )
+
+        self.bert = AutoModel.from_pretrained(
+            pretrain_dir, 
+            config=config
+        )
+        # do_not_require_grads(self.bert)  # freeze bert parameters
+
+        self.pre_classifier = nn.Linear(config.hidden_size * 2, config.hidden_size)
+        self.classifier = nn.Sequential(
+            nn.ReLU(),
+            nn.Dropout(config.hidden_dropout_prob),
+            nn.Linear(config.hidden_size, num_classes)
+        )
+
+    def forward(self, sequences, segments=None, head_mask=None):
+        mask = (sequences > 0).float()
+        bert_output = self.bert(
+            input_ids=sequences,
+            attention_mask=mask,
+            token_type_ids=segments,
+            head_mask=head_mask
+        )
+        # we only need the hidden state here and don't need
+        # transformer output, so index 0
+        hidden_state = bert_output[0]  # (bs, seq_len, dim)
+        # we take embeddings from the [CLS] token, so again index 0
+        pooled_output = torch.cat([
+            torch.max(hidden_state, 1)[0],
+            torch.mean(hidden_state, 1),
+        ], 1)
+        pooled_output = self.pre_classifier(pooled_output)  # (bs, dim)
+        logits = self.classifier(pooled_output)  # (bs, dim)
+        return logits
+
 
 
 class MultipleInputTransfModel(nn.Module):
