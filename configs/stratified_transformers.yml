@@ -11,9 +11,8 @@ stages:
   data_params:
     num_workers: 6
     batch_size: 6
-    train_pickle: data/trans_train.pkl
-    valid_pickle: data/trans_valid.pkl
-    # seq_percentile: 95
+    train_pickle: data/folds/transf_train_0.pkl
+    valid_pickle: data/folds/transf_valid_0.pkl
     transformer_dir: data/uncased_L-12_H-768_A-12
 
   criterion_params:
@@ -26,7 +25,6 @@ stages:
 
     optim:
       callback: OptimizerCallback
-      # accumulation_steps: 4
 
     spearman:
       callback: SpearmanScoreCallback
@@ -45,7 +43,7 @@ stages:
 
   stage2:
     state_params:
-      num_epochs: 10
+      num_epochs: 5
     
     optimizer_params:
       optimizer: RAdam
@@ -53,10 +51,24 @@ stages:
 
   stage3:
     state_params:
-      num_epochs: 10
+      num_epochs: 5
     
     optimizer_params:
       optimizer: RAdam
       lr: 0.00001
 
+  stage4:
+    state_params:
+      num_epochs: 5
     
+    optimizer_params:
+      optimizer: RAdam
+      lr: 0.00001
+
+  stage5:
+    state_params:
+      num_epochs: 5
+    
+    optimizer_params:
+      optimizer: RAdam
+      lr: 0.00001

@@ -10,6 +10,7 @@ from .models import (
     MultiInputLstmGruAttention,
     TransfModel,
     PooledTransfModel,
+    PooledLstmTransfModel,
     MultipleInputTransfModel,
     patch_model_with_embedding,
     model_from_checkpoint,
@@ -33,6 +34,7 @@ registry.Model(MultiInputLstmGruAttention)
 registry.Model(TransfModel)
 registry.Model(PooledTransfModel)
 registry.Model(MultipleInputTransfModel)
+registry.Model(PooledLstmTransfModel)
 # functions
 registry.Model(patch_model_with_embedding)
 registry.Model(model_from_checkpoint)

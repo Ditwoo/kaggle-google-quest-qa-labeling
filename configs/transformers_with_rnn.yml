@@ -1,5 +1,5 @@
 model_params:
-  model: TransfModel
+  model: PooledLstmTransfModel
   pretrain_dir: bert-base-uncased
   num_classes: 30
 
@@ -9,11 +9,8 @@ stages:
     minimize_metric: False
 
   data_params:
-    num_workers: 6
-    batch_size: 6
-    train_pickle: data/trans_train.pkl
-    valid_pickle: data/trans_valid.pkl
-    # seq_percentile: 95
+    batch_size: &bs 6
+    num_workers: *bs
     transformer_dir: data/uncased_L-12_H-768_A-12
 
   criterion_params:
@@ -26,7 +23,7 @@ stages:
 
     optim:
       callback: OptimizerCallback
-      # accumulation_steps: 4
+      accumulation_steps: 4
 
     spearman:
       callback: SpearmanScoreCallback
@@ -35,20 +32,28 @@ stages:
     saver:
       callback: CheckpointCallback
 
+  stage_freezed_0:
+    state_params:
+      num_epochs: 2
+    
+    optimizer_params:
+      optimizer: Adam
+      lr: 0.0001
+
   stage1:
     state_params:
       num_epochs: 10
     
     optimizer_params:
-      optimizer: RAdam
-      lr: 0.00002
+      optimizer: Adam
+      lr: 0.00003
 
   stage2:
     state_params:
       num_epochs: 10
     
     optimizer_params:
-      optimizer: RAdam
+      optimizer: Adam
       lr: 0.00001
 
   stage3:
@@ -56,7 +61,5 @@ stages:
       num_epochs: 10
     
     optimizer_params:
-      optimizer: RAdam
-      lr: 0.00001
-
-    
+      optimizer: Adam
+      lr: 0.000005

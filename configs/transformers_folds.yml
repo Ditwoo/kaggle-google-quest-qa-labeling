@@ -1,5 +1,5 @@
 model_params:
-  model: TransfModel
+  model: PooledTransfModel
   pretrain_dir: bert-base-uncased
   num_classes: 30
 
@@ -10,10 +10,7 @@ stages:
 
   data_params:
     num_workers: 6
-    batch_size: 6
-    train_pickle: data/trans_train.pkl
-    valid_pickle: data/trans_valid.pkl
-    # seq_percentile: 95
+    batch_size: 8
     transformer_dir: data/uncased_L-12_H-768_A-12
 
   criterion_params:
@@ -40,15 +37,15 @@ stages:
       num_epochs: 10
     
     optimizer_params:
-      optimizer: RAdam
-      lr: 0.00002
+      optimizer: Adam
+      lr: 0.00003
 
   stage2:
     state_params:
       num_epochs: 10
     
     optimizer_params:
-      optimizer: RAdam
+      optimizer: Adam
       lr: 0.00001
 
   stage3:
@@ -56,7 +53,5 @@ stages:
       num_epochs: 10
     
     optimizer_params:
-      optimizer: RAdam
-      lr: 0.00001
-
-    
+      optimizer: Adam
+      lr: 0.000005

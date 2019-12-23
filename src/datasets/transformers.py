@@ -53,18 +53,71 @@ class TransformerFieldsDataset(Dataset):
         tokens = ["[CLS]"] + title_body + ["[SEP]"] + ans + ["[SEP]"]
         return tokens
 
+    # def _build_tokens(self, 
+    #                   title, 
+    #                   question, 
+    #                   answer, 
+    #                   t_max_len=30, 
+    #                   q_max_len=239, 
+    #                   a_max_len=239):
+
+    #     t = self.tokenizer.tokenize(title)
+    #     q = self.tokenizer.tokenize(question)
+    #     a = self.tokenizer.tokenize(answer)
+        
+    #     t_len = len(t)
+    #     q_len = len(q)
+    #     a_len = len(a)
+
+    #     if t_len + q_len + a_len + 4 > MAX_LEN: 
+    #         if t_max_len > t_len:
+    #             t_new_len = t_len
+    #             a_max_len = a_max_len + floor((t_max_len - t_len)/2)
+    #             q_max_len = q_max_len + ceil((t_max_len - t_len)/2)
+    #         else:
+    #             t_new_len = t_max_len
+
+    #         if a_max_len > a_len:
+    #             a_new_len = a_len 
+    #             q_new_len = q_max_len + (a_max_len - a_len)
+    #         elif q_max_len > q_len:
+    #             a_new_len = a_max_len + (q_max_len - q_len)
+    #             q_new_len = q_len
+    #         else:
+    #             a_new_len = a_max_len
+    #             q_new_len = q_max_len
+
+    #         if t_new_len + a_new_len + q_new_len + 4 != MAX_LEN:
+    #             raise ValueError(
+    #                 "New sequence length should be %d, but is %d" % (MAX_LEN, (t_new_len + a_new_len + q_new_len + 4))
+    #             )
+
+    #         t = t[:t_new_len]
+    #         q = q[:q_new_len]
+    #         a = a[:a_new_len]
+
+    #     tokens = ["[CLS]"] + t + ["[SEP]"] + q + ["[SEP]"] + a + ["[SEP]"]
+    #     return tokens
+
+    # def _build_segments(self, tokens):
+    #     segments = []
+    #     sep_num = 0
+    #     current_segment_id = 0
+    #     for token in tokens:
+    #         segments.append(current_segment_id)
+    #         if token == "[SEP]":
+    #             if sep_num > 1:
+    #                 current_segment_id = 1
+    #             sep_num += 1
+    #     return segments
+
     def _build_segments(self, tokens):
         segments = []
-        # first_sep = True
         current_segment_id = 0
         for token in tokens:
             segments.append(current_segment_id)
             if token == "[SEP]":
                 current_segment_id = 1
-                # if first_sep:
-                #     first_sep = False 
-                # else:
-                #     current_segment_id = 1
         return segments
 
     def __getitem__(self, idx):
@@ -72,19 +125,19 @@ class TransformerFieldsDataset(Dataset):
         title = self.df.at[index, "question_title"]
         body = self.df.at[index, "question_body"]
         answer = self.df.at[index, "answer"]
-
+        # combine fields into one sequence
         tokens = self._build_tokens(title, body, answer)
         segments = self._build_segments(tokens)
         token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+        # pad sequneces if needed
         if len(token_ids) < MAX_LEN:
             token_ids += [self.PAD] * (MAX_LEN - len(token_ids))
         if len(segments) < MAX_LEN:
             segments += [self.PAD] * (MAX_LEN - len(segments))
-        
+        # converting to tensors
         token_ids = torch.LongTensor(token_ids)
-        segments = torch.LongTensor(segments)
-        target = [self.df.at[index, c] for c in self.target] 
-        target = torch.FloatTensor(target)
+        segments = torch.LongTensor(segments) 
+        target = torch.FloatTensor([self.df.at[index, c] for c in self.target])
         return {"sequences": token_ids, "segments": segments, "targets": target}
 
 

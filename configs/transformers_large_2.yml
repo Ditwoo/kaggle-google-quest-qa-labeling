@@ -1,7 +1,10 @@
 model_params:
-  model: TransfModel
-  pretrain_dir: bert-base-uncased
-  num_classes: 30
+  model: model_from_checkpoint
+  checkpoint: logs/folds/tlgkf_2/checkpoints/best.pth
+  params:
+    model: PooledTransfModel
+    pretrain_dir: bert-large-uncased
+    num_classes: 30
 
 stages:
   state_params:
@@ -9,11 +12,8 @@ stages:
     minimize_metric: False
 
   data_params:
-    num_workers: 6
-    batch_size: 6
-    train_pickle: data/trans_train.pkl
-    valid_pickle: data/trans_valid.pkl
-    # seq_percentile: 95
+    num_workers: &nw 2
+    batch_size: *nw
     transformer_dir: data/uncased_L-12_H-768_A-12
 
   criterion_params:
@@ -26,7 +26,7 @@ stages:
 
     optim:
       callback: OptimizerCallback
-      # accumulation_steps: 4
+      accumulation_steps: 16
 
     spearman:
       callback: SpearmanScoreCallback
@@ -35,28 +35,10 @@ stages:
     saver:
       callback: CheckpointCallback
 
-  stage1:
-    state_params:
-      num_epochs: 10
-    
-    optimizer_params:
-      optimizer: RAdam
-      lr: 0.00002
-
   stage2:
     state_params:
       num_epochs: 10
     
     optimizer_params:
-      optimizer: RAdam
+      optimizer: Adam
       lr: 0.00001
-
-  stage3:
-    state_params:
-      num_epochs: 10
-    
-    optimizer_params:
-      optimizer: RAdam
-      lr: 0.00001
-
-    

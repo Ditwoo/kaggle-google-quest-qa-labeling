@@ -1,7 +1,10 @@
 model_params:
-  model: TransfModel
-  pretrain_dir: bert-base-uncased
-  num_classes: 30
+  model: model_from_checkpoint
+  checkpoint: logs/transformers/checkpoints/stage2.12.pth
+  params:
+    model: TransfModel
+    pretrain_dir: bert-base-uncased
+    num_classes: 30
 
 stages:
   state_params:
@@ -41,7 +44,7 @@ stages:
     
     optimizer_params:
       optimizer: RAdam
-      lr: 0.00002
+      lr: 0.000005
 
   stage2:
     state_params:
@@ -49,7 +52,7 @@ stages:
     
     optimizer_params:
       optimizer: RAdam
-      lr: 0.00001
+      lr: 0.000001
 
   stage3:
     state_params:
@@ -57,6 +60,6 @@ stages:
     
     optimizer_params:
       optimizer: RAdam
-      lr: 0.00001
+      lr: 0.0000001
 
     

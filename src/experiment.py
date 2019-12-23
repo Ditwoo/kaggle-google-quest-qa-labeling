@@ -3,7 +3,8 @@ import pickle
 from collections import OrderedDict
 
 import numpy as np
-import scipy.sparse as sp
+import torch
+import torch.nn as nn
 from catalyst.dl import ConfigExperiment
 from sklearn.model_selection import train_test_split
 
@@ -24,6 +25,24 @@ from .datasets.augmentations import (
 
 
 class Experiment(ConfigExperiment):
+
+    def _postprocess_model_for_stage(self, stage: str, model: nn.Module):
+
+        # import pdb; pdb.set_trace()
+
+        model_ = model
+        if isinstance(model, torch.nn.DataParallel):
+            model_ = model_.module
+
+        if stage.startswith("stage_freezed"):
+            for param in model_.bert.parameters():
+                param.requires_grad = False
+        else:
+            for param in model_.bert.parameters():
+                param.requires_grad = True
+
+        return model_
+
     def get_datasets(self,
                      stage: str,
                      # seq_percentile: int = 75,

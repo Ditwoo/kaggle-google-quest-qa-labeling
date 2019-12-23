@@ -29,14 +29,17 @@ def main():
     model = model.to(device)
     model.eval()
 
-    example_input = (
-        torch.randint(low=0, high=10, size=(1, 25)).to(device),
-        torch.randint(low=0, high=10, size=(1, 100)).to(device),
-        torch.randint(low=0, high=10, size=(1, 50)).to(device),
-        torch.randint(high=1, size=(1, 1)).to(device),
-        torch.randint(high=1, size=(1, 1)).to(device),
-    )
-    trace = torch.jit.trace(model, example_input)
+    # example_input = (
+        # torch.randint(low=0, high=10, size=(1, 512)).to(device),
+        # torch.randint(low=0, high=10, size=(1, 100)).to(device),
+        # torch.randint(low=0, high=10, size=(1, 50)).to(device),
+        # torch.randint(high=1, size=(1, 1)).to(device),
+        # torch.randint(high=1, size=(1, 1)).to(device),
+    # )
+    example_input = torch.randint(low=1, high=10, size=(1, 512)).to(device)
+    example_input[0, 0] = 101
+    example_seg = torch.randint(low=0, high=2, size=(1, 512)).to(device)
+    trace = torch.jit.trace(model, (example_input, example_seg))
     torch.jit.save(trace, out_file)
     print(f'Traced model ({model_file}) to \'{out_file}\'', flush=True)
 
