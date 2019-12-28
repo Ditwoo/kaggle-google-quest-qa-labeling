@@ -6,8 +6,8 @@ class Runner(SupervisedRunner):
         super().__init__(
             model=model, 
             device=device, 
-            input_key=["sequences", "segments"],
+            # input_key=["sequences", "segments"],
             # input_key=["question_title", "question_body", "answer"], 
-            # input_key=["question_title", "question_body", "answer", "category", "host"], 
+            input_key=["question_title", "question_body", "answer", "category", "host"], 
             # output_key="logits",
         )

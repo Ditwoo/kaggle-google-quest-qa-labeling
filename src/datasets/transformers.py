@@ -2,7 +2,7 @@ from math import floor, ceil
 import numpy as np
 import torch
 from pandas import DataFrame
-from transformers import BertTokenizer
+from transformers import BertTokenizer, XLNetTokenizer
 from torch.utils.data import Dataset
 from typing import List
 
@@ -26,7 +26,8 @@ class TransformerFieldsDataset(Dataset):
         self.field = field
         self.train_mode = train_mode
         self.tokenizer: BertTokenizer = BertTokenizer.from_pretrained(tokenizer_dir)
-        self.PAD = self.tokenizer.vocab["[PAD]"]  # or 0 token
+        # self.tokenizer: XLNetTokenizer = XLNetTokenizer.from_pretrained(tokenizer_dir)
+        self.PAD = 0 # self.tokenizer.vocab["[PAD]"]
 
     def __len__(self):
         return self.df.shape[0]
@@ -42,6 +43,8 @@ class TransformerFieldsDataset(Dataset):
             return tokens[:max_num // 2] + tokens[-(max_num - max_num // 2):]
 
     def _build_tokens(self, title, question, answer):
+        # TODO: check option to dynamicaly build sequence based on 
+        #       sum of lengths of fields
         title_body = self._select_tokens(
             self.tokenizer.tokenize(title + "," + question), 
             max_num=MAX_QUESTION_LEN

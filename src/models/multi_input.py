@@ -220,7 +220,5 @@ class MultiInputLstmGruAttention(nn.Module):
         host = self.host_embedding(host).squeeze(1)
 
         x = torch.cat([title, question, answer, category, host], 1)
-
         x = self.head(x)
-
         return x

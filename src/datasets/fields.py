@@ -3,7 +3,8 @@ from pandas import DataFrame
 import torch
 from torch.utils.data import Dataset
 from typing import List
-from .utils import pad_sequences
+from transformers import BertTokenizer, XLNetTokenizer
+from .utils import pad_sequences, DummyTokenizer
 from .augmentations import SeqTransformationInterface
 
 
@@ -51,6 +52,31 @@ class FieldsDataset(Dataset):
         features = state[self.field] if self.field is not None else state
         target = [self.df.at[index, c] for c in self.target] 
         return features, target
+
+
+class TokenizedFieldsDataset(Dataset):
+    def __init__(self, 
+                 df: DataFrame, 
+                 feature_cols: List[str], 
+                 target: List[str], 
+                 tokenizer_dir: str, 
+                 field: str = None):
+        self.df: DataFrame = df
+        self.features: List[str] = feature_cols
+        self.target: List[str] = target
+        self.tokenizer: DummyTokenizer = DummyTokenizer.from_file(tokenizer_dir)
+        self.field = field
+
+    def __len__(self):
+        return self.df.shape[0]
+    
+    def __getitem__(self, idx):
+        index = self.df.index[idx]
+        state = {c: self.df.at[index, c] for c in self.features}
+        state = self.tokenizer.tokenize(state)               # split strings to lists of tokens
+        state = self.tokenizer.convert_tokens_to_ids(state)  # map tokens to ids
+        target = [self.df.at[index, c] for c in self.target] 
+        return state, target
 
 
 class SequencesCollator:

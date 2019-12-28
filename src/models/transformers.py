@@ -67,6 +67,7 @@ class PooledTransfModel(nn.Module):
         self.classifier = nn.Sequential(
             nn.ReLU(),
             nn.Dropout(config.hidden_dropout_prob),
+            # nn.Dropout(config.dropout),
             nn.Linear(config.hidden_size, num_classes)
         )
 
