@@ -43,17 +43,17 @@ class TransformerFieldsDataset(Dataset):
             return tokens[:max_num // 2] + tokens[-(max_num - max_num // 2):]
 
     def _build_tokens(self, title, question, answer):
-        # TODO: check option to dynamicaly build sequence based on 
-        #       sum of lengths of fields
-        title_body = self._select_tokens(
-            self.tokenizer.tokenize(title + "," + question), 
+        title_body_tokens = self.tokenizer.tokenize(title + "," + question)
+        title_body_tokens = self._select_tokens(
+            title_body_tokens, 
             max_num=MAX_QUESTION_LEN
         )
-        ans = self._select_tokens(
-            self.tokenizer.tokenize(answer), 
+        ans_tokens = self.tokenizer.tokenize(answer)
+        ans_tokens = self._select_tokens(
+            ans_tokens, 
             max_num=MAX_ANSWER_LEN
         )
-        tokens = ["[CLS]"] + title_body + ["[SEP]"] + ans + ["[SEP]"]
+        tokens = ["[CLS]"] + title_body_tokens + ["[SEP]"] + ans_tokens + ["[SEP]"]
         return tokens
 
     # def _build_tokens(self, 

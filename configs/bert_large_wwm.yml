@@ -1,10 +1,11 @@
 model_params:
-  model: model_from_checkpoint
-  checkpoint: logs/folds/bert_large_uncased_00_1/checkpoints/best.pth
-  params:
-    model: PooledTransfModel
-    pretrain_dir: bert-large-uncased
-    num_classes: 30
+  model: PooledTransfModel
+  pretrain_dir: bert-large-uncased-whole-word-masking
+  num_classes: 30
+
+# distributed_params:
+#   opt_level: O1
+#   syncbn: True
 
 stages:
   state_params:
@@ -14,7 +15,7 @@ stages:
   data_params:
     num_workers: &nw 2
     batch_size: *nw
-    tokenizer_dir: data/uncased_L-12_H-768_A-12
+    transformer_dir: data/uncased_L-24_H-1024_A-16
 
   criterion_params:
     criterion: BCEWithLogitsLoss
@@ -35,10 +36,26 @@ stages:
     saver:
       callback: CheckpointCallback
 
-  stage2:
+  stage1:
     state_params:
       num_epochs: 10
     
     optimizer_params:
       optimizer: Adam
-      lr: 0.000001
+      lr: 0.00003
+
+  # stage2:
+  #   state_params:
+  #     num_epochs: 10
+    
+  #   optimizer_params:
+  #     optimizer: Adam
+  #     lr: 0.00001
+
+  # stage3:
+  #   state_params:
+  #     num_epochs: 10
+    
+  #   optimizer_params:
+  #     optimizer: Adam
+  #     lr: 0.000005

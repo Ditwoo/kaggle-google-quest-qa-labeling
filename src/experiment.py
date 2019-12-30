@@ -92,7 +92,11 @@ class Experiment(ConfigExperiment):
         print(f"Train shapes - {df.shape}")
         datasets = OrderedDict()
         datasets["train"] = dict(
-            dataset=TransformerFieldsDataset(df, TARGETS, transformer_dir),
+            dataset=TransformerFieldsDataset(
+                df=df, 
+                target=TARGETS, 
+                tokenizer_dir=tokenizer_dir,
+            ),
             shuffle=True,
         )
         
@@ -104,7 +108,11 @@ class Experiment(ConfigExperiment):
 
         print(f"Valid shapes - {df.shape}")
         datasets["valid"] = dict(
-            dataset=TransformerFieldsDataset(df, TARGETS, transformer_dir),
+            dataset=TransformerFieldsDataset(
+                df=df, 
+                target=TARGETS, 
+                tokenizer_dir=tokenizer_dir,
+            ),
             shuffle=False,
         )
         return datasets
@@ -167,4 +175,4 @@ class Experiment(ConfigExperiment):
         return datasets
 
     def get_datasets(self, stage: str, **kwargs):
-        return self.rnn_get_datasets(stage, **kwargs)
+        return self.transformer_get_datasets(stage, **kwargs)

@@ -15,7 +15,7 @@ stages:
   data_params:
     num_workers: &nw 2
     batch_size: *nw
-    transformer_dir: data/uncased_L-12_H-768_A-12
+    tokenizer_dir: data/uncased_L-12_H-768_A-12
 
   criterion_params:
     criterion: BCEWithLogitsLoss
@@ -27,7 +27,7 @@ stages:
 
     optim:
       callback: OptimizerCallback
-      accumulation_steps: 16
+      accumulation_steps: 4
 
     spearman:
       callback: SpearmanScoreCallback
