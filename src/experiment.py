@@ -15,7 +15,8 @@ from .datasets import (
     FieldsCollator,
     TransformerFieldsDataset,
     TransformersCollator,
-    TransformerMultipleFieldsDataset
+    TransformerMultipleFieldsDataset,
+    TransformerFieldsDatasetWithCategoricalFeatures,
 )
 from .datasets.augmentations import (
     CombineSeqs, 
@@ -92,7 +93,7 @@ class Experiment(ConfigExperiment):
         print(f"Train shapes - {df.shape}")
         datasets = OrderedDict()
         datasets["train"] = dict(
-            dataset=TransformerFieldsDataset(
+            dataset=TransformerFieldsDatasetWithCategoricalFeatures(
                 df=df, 
                 target=TARGETS, 
                 tokenizer_dir=tokenizer_dir,
@@ -108,7 +109,7 @@ class Experiment(ConfigExperiment):
 
         print(f"Valid shapes - {df.shape}")
         datasets["valid"] = dict(
-            dataset=TransformerFieldsDataset(
+            dataset=TransformerFieldsDatasetWithCategoricalFeatures(
                 df=df, 
                 target=TARGETS, 
                 tokenizer_dir=tokenizer_dir,

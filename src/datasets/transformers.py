@@ -12,6 +12,82 @@ MAX_QUESTION_LEN = 250
 MAX_ANSWER_LEN = 259
 SEP_TOKEN_ID = 102
 
+HOST_MAP = {
+    '<unk>': 0,
+    'academia.stackexchange.com': 1,
+    'android.stackexchange.com': 2,
+    'anime.stackexchange.com': 3,
+    'apple.stackexchange.com': 4,
+    'askubuntu.com': 5,
+    'bicycles.stackexchange.com': 6,
+    'biology.stackexchange.com': 7,
+    'blender.stackexchange.com': 8,
+    'boardgames.stackexchange.com': 9,
+    'chemistry.stackexchange.com': 10,
+    'christianity.stackexchange.com': 11,
+    'codereview.stackexchange.com': 12,
+    'cooking.stackexchange.com': 13,
+    'crypto.stackexchange.com': 14,
+    'cs.stackexchange.com': 15,
+    'dba.stackexchange.com': 16,
+    'diy.stackexchange.com': 17,
+    'drupal.stackexchange.com': 18,
+    'dsp.stackexchange.com': 19,
+    'electronics.stackexchange.com': 20,
+    'ell.stackexchange.com': 21,
+    'english.stackexchange.com': 22,
+    'expressionengine.stackexchange.com': 23,
+    'gamedev.stackexchange.com': 24,
+    'gaming.stackexchange.com': 25,
+    'gis.stackexchange.com': 26,
+    'graphicdesign.stackexchange.com': 27,
+    'judaism.stackexchange.com': 28,
+    'magento.stackexchange.com': 29,
+    'math.stackexchange.com': 30,
+    'mathematica.stackexchange.com': 31,
+    'mathoverflow.net': 32,
+    'mechanics.stackexchange.com': 33,
+    'meta.askubuntu.com': 34,
+    'meta.christianity.stackexchange.com': 35,
+    'meta.codereview.stackexchange.com': 36,
+    'meta.math.stackexchange.com': 37,
+    'meta.stackexchange.com': 38,
+    'meta.superuser.com': 39,
+    'money.stackexchange.com': 40,
+    'movies.stackexchange.com': 41,
+    'music.stackexchange.com': 42,
+    'photo.stackexchange.com': 43,
+    'physics.stackexchange.com': 44,
+    'programmers.stackexchange.com': 45,
+    'raspberrypi.stackexchange.com': 46,
+    'robotics.stackexchange.com': 47,
+    'rpg.stackexchange.com': 48,
+    'salesforce.stackexchange.com': 49,
+    'scifi.stackexchange.com': 50,
+    'security.stackexchange.com': 51,
+    'serverfault.com': 52,
+    'sharepoint.stackexchange.com': 53,
+    'softwarerecs.stackexchange.com': 54,
+    'stackoverflow.com': 55,
+    'stats.stackexchange.com': 56,
+    'superuser.com': 57,
+    'tex.stackexchange.com': 58,
+    'travel.stackexchange.com': 59,
+    'unix.stackexchange.com': 60,
+    'ux.stackexchange.com': 61,
+    'webapps.stackexchange.com': 62,
+    'webmasters.stackexchange.com': 63,
+    'wordpress.stackexchange.com': 64
+}
+CATEGORY_MAP = {
+    '<unk>': 0,
+    'CULTURE': 1,
+    'LIFE_ARTS': 2,
+    'SCIENCE': 3,
+    'STACKOVERFLOW': 4,
+    'TECHNOLOGY': 5
+}
+
 
 class TransformerFieldsDataset(Dataset):
     def __init__(self, 
@@ -142,6 +218,46 @@ class TransformerFieldsDataset(Dataset):
         segments = torch.LongTensor(segments) 
         target = torch.FloatTensor([self.df.at[index, c] for c in self.target])
         return {"sequences": token_ids, "segments": segments, "targets": target}
+
+
+class TransformerFieldsDatasetWithCategoricalFeatures(TransformerFieldsDataset):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.ctg_col = "category"
+        self.host_col = "host"
+
+    def __getitem__(self, idx):
+        index = self.df.index[idx]
+        title = self.df.at[index, "question_title"]
+        body = self.df.at[index, "question_body"]
+        answer = self.df.at[index, "answer"]
+        category = self.df.at[index, self.ctg_col]
+        category = CATEGORY_MAP[category if category in CATEGORY_MAP else "<unk>"]
+        host = self.df.at[index, self.host_col]
+        host = HOST_MAP[host if host in HOST_MAP else "<unk>"]
+        # combine fields into one sequence
+        tokens = self._build_tokens(title, body, answer)
+        segments = self._build_segments(tokens)
+        token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+        # pad sequneces if needed
+        if len(token_ids) < MAX_LEN:
+            token_ids += [self.PAD] * (MAX_LEN - len(token_ids))
+        if len(segments) < MAX_LEN:
+            segments += [self.PAD] * (MAX_LEN - len(segments))
+        # converting to tensors
+        token_ids = torch.LongTensor(token_ids)
+        segments = torch.LongTensor(segments) 
+        target = torch.FloatTensor([self.df.at[index, c] for c in self.target])
+        category_id = torch.LongTensor([category])
+        host_id = torch.LongTensor([host])
+        res = {
+            "sequences": token_ids, 
+            "segments": segments, 
+            "category": category_id,
+            "host": host_id,
+            "targets": target,
+        }
+        return res 
 
 
 class TransformerMultipleFieldsDataset(Dataset):

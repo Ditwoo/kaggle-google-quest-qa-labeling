@@ -146,11 +146,13 @@ class PooledLstmTransfModel(nn.Module):
         return logits
 
 
-class MultipleInputTransfModel(nn.Module):
+class PooledTransfModelWithCatericalFeatures(nn.Module):
     def __init__(self,
                  pretrain_dir: str,
+                 num_categories: int,
+                 num_hosts: int,
                  num_classes: int = 1):
-        super(MultipleInputTransfModel, self).__init__()
+        super(PooledTransfModelWithCatericalFeatures, self).__init__()
 
         config = AutoConfig.from_pretrained(
             pretrain_dir, 
@@ -161,35 +163,44 @@ class MultipleInputTransfModel(nn.Module):
             pretrain_dir, 
             config=config
         )
-        do_not_require_grads(self.bert)  # freeze bert parameters
+        
+        categories_emb_dim = 8
+        self.categories_emb = nn.Embedding(num_categories, categories_emb_dim)
 
+        hosts_emb_dim = 16
+        self.hosts_emb = nn.Embedding(num_hosts, hosts_emb_dim)
+
+        self.pre_classifier = nn.Linear(
+            config.hidden_size * 2 + hosts_emb_dim + categories_emb_dim, 
+            config.hidden_size * 4
+        )
         self.classifier = nn.Sequential(
-            nn.Linear(config.hidden_size * 3, config.hidden_size),
             nn.ReLU(),
             nn.Dropout(config.hidden_dropout_prob),
-            nn.Linear(config.hidden_size, num_classes)
+            # nn.Dropout(config.dropout),
+            nn.Linear(config.hidden_size * 4, num_classes)
         )
-    
-    def forward(self, question_title, question_body, answer, head_mask=None):
-        title = self.bert(
-            input_ids=question_title,
-            attention_mask=(question_title > 0).float(),
+
+    def forward(self, sequences, category, host, segments=None, head_mask=None):
+        mask = (sequences > 0).float()
+        bert_output = self.bert(
+            input_ids=sequences,
+            attention_mask=mask,
+            token_type_ids=segments,
             head_mask=head_mask
-        )[0][:, 0]
-
-        body = self.bert(
-            input_ids=question_body,
-            attention_mask=(question_body > 0).float(),
-            head_mask=head_mask
-        )[0][:, 0]
-
-        ans = self.bert(
-            input_ids=question_title,
-            attention_mask=(answer > 0).float(),
-            head_mask=head_mask
-        )[0][:, 0]
-
-        concated = torch.cat([title, body, ans], 1)
-        logits = self.classifier(concated)
-
+        )
+        ctg_emb = self.categories_emb(category).squeeze(1)
+        host_emb = self.hosts_emb(host).squeeze(1)
+        # we only need the hidden state here and don't need
+        # transformer output, so index 0
+        hidden_state = bert_output[0]  # (bs, seq_len, dim)
+        # we take embeddings from the [CLS] token, so again index 0
+        pooled_output = torch.cat([
+            torch.max(hidden_state, 1)[0],
+            torch.mean(hidden_state, 1),
+            ctg_emb,
+            host_emb
+        ], 1)
+        pooled_output = self.pre_classifier(pooled_output)  # (bs, dim)
+        logits = self.classifier(pooled_output)  # (bs, dim)
         return logits

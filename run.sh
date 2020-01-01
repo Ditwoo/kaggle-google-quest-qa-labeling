@@ -1,5 +1,6 @@
-CONF=configs/transformers_large_2.yml
-LOGDDIR=logs/folds/bert_large_uncased_00_2
+#!/bin/bash
+CONF=configs/transformers_base_with_categorical_features.yml
+LOGDDIR=logs/folds/bert_base_uncased_cat_features_00
 
 # specify env vars (if specified - passed args to config will be ignored)
 # NOTE: used models with split usign group kfold
