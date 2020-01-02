@@ -41,8 +41,8 @@ def main():
         example_question_title = torch.randint(low=0, high=10, size=(1, 100)).to(device)
         example_question_body = torch.randint(low=0, high=10, size=(1, 200)).to(device)
         example_answer = torch.randint(low=0, high=10, size=(1, 250)).to(device)
-        example_category = torch.randint(high=10, size=(1, 1)).to(device)
-        example_host = torch.randint(high=10, size=(1, 1)).to(device)
+        example_category = torch.randint(high=5, size=(1, 1)).to(device)
+        example_host = torch.randint(high=5, size=(1, 1)).to(device)
         model_input = (example_question_title, example_question_body, example_answer, 
                        example_category, example_host)
     else:
@@ -50,8 +50,8 @@ def main():
         example_input = torch.randint(low=1, high=10, size=(1, 512)).to(device)
         example_input[0, 0] = 101
         example_seg = torch.randint(low=0, high=2, size=(1, 512)).to(device)
-        example_category = torch.randint(high=10, size=(1, 1)).to(device)
-        example_host = torch.randint(high=10, size=(1, 1)).to(device)
+        example_category = torch.randint(high=5, size=(1, 1)).to(device)
+        example_host = torch.randint(high=5, size=(1, 1)).to(device)
         model_input = (example_input, example_category, example_host, example_seg)
         
     trace = torch.jit.trace(model, model_input)

@@ -19,11 +19,11 @@ CHECKPOINT=logs/folds/bert_base_uncased_cat_features_03/checkpoints/stage2.11.pt
 OUTPUT=${ONAME_PATTERN}_03.pt
 python3 -m src.trace --config ${CONF} --state ${CHECKPOINT} --input-type ${INPUT_TYPE} --out ${OUTPUT}
 
-CHECKPOINT=logs/folds/bert_base_uncased_cat_features_04/checkpoints/stage4.21.pth
+CHECKPOINT=logs/folds/bert_base_uncased_cat_features_04/checkpoints/stage2.11.pth  # 0.3833
 OUTPUT=${ONAME_PATTERN}_04.pt
 python3 -m src.trace --config ${CONF} --state ${CHECKPOINT} --input-type ${INPUT_TYPE} --out ${OUTPUT}
 echo "Traced all models based on config - ${CONF}."
 
 ARCHIVE_NAME=bert_base_uncased_with_cat_features.zip
-zip -r ${ARCHIVE_NAME} bert_base_uncased_with_cat_features_*
+zip -r ${ARCHIVE_NAME} ${ONAME_PATTERN}_*
 echo "Compressed to archive - ${ARCHIVE_NAME}."
