@@ -12,6 +12,7 @@ from .models import (
     PooledTransfModel,
     PooledLstmTransfModel,
     PooledTransfModelWithCatericalFeatures,
+    PTCFS,
     patch_model_with_embedding,
     model_from_checkpoint,
     unfreezed_transf,
@@ -35,6 +36,7 @@ registry.Model(TransfModel)
 registry.Model(PooledTransfModel)
 registry.Model(PooledLstmTransfModel)
 registry.Model(PooledTransfModelWithCatericalFeatures)
+registry.Model(PTCFS)
 # functions
 registry.Model(patch_model_with_embedding)
 registry.Model(model_from_checkpoint)

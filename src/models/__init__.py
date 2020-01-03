@@ -10,6 +10,7 @@ from .transformers import (
     PooledTransfModel, 
     PooledLstmTransfModel,
     PooledTransfModelWithCatericalFeatures,
+    PTCFS,
 )
 from .utils import (
     patch_model_with_embedding, 

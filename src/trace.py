@@ -10,6 +10,13 @@ parser.add_argument('--out', dest='out', help='file to use for storing traced mo
 parser.add_argument('--device', dest='device', help='device to use for tracing model', type=str, default='cuda:0')
 parser.add_argument('--input-type', dest='inp_type', help='model input type', type=str, default='transformers')
 
+INPUT_TYPES = {
+    "transformers", 
+    "fields", 
+    "transformers-categories",
+    "transformers-categories-stats",
+}
+
 
 def main():
     args = vars(parser.parse_args())
@@ -19,9 +26,8 @@ def main():
     device = torch.device(args['device'])
     input_type = args['inp_type']
 
-    if input_type not in {'transformers', 'fields', 'transformers-with-categories'}:
-        raise ValueError("'--input-type' should be one of "
-                         "('transformers', 'fields', 'transformers-with-categories')!")
+    if input_type not in INPUT_TYPES:
+        raise ValueError(f"'--input-type' should be one of {INPUT_TYPES}")
 
     with open(config_file, 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
@@ -32,12 +38,12 @@ def main():
     model = model.to(device)
     model.eval()
 
-    if input_type == 'transformers':
+    if input_type == "transformers":
         example_input = torch.randint(low=1, high=10, size=(1, 512)).to(device)
         example_input[0, 0] = 101
         example_seg = torch.randint(low=0, high=2, size=(1, 512)).to(device)
         model_input = (example_input, example_seg)
-    elif input_type == 'fields':
+    elif input_type == "fields":
         example_question_title = torch.randint(low=0, high=10, size=(1, 100)).to(device)
         example_question_body = torch.randint(low=0, high=10, size=(1, 200)).to(device)
         example_answer = torch.randint(low=0, high=10, size=(1, 250)).to(device)
@@ -45,15 +51,22 @@ def main():
         example_host = torch.randint(high=5, size=(1, 1)).to(device)
         model_input = (example_question_title, example_question_body, example_answer, 
                        example_category, example_host)
-    else:
-        # transformers with categories
+    elif input_type == "transformers-categories":
         example_input = torch.randint(low=1, high=10, size=(1, 512)).to(device)
         example_input[0, 0] = 101
         example_seg = torch.randint(low=0, high=2, size=(1, 512)).to(device)
         example_category = torch.randint(high=5, size=(1, 1)).to(device)
         example_host = torch.randint(high=5, size=(1, 1)).to(device)
         model_input = (example_input, example_category, example_host, example_seg)
-        
+    else:
+        example_input = torch.randint(low=1, high=10, size=(1, 512)).to(device)
+        example_input[0, 0] = 101
+        example_seg = torch.randint(low=0, high=2, size=(1, 512)).to(device)
+        example_category = torch.randint(high=5, size=(1, 1)).to(device)
+        example_host = torch.randint(high=5, size=(1, 1)).to(device)
+        example_stats = torch.randn(1, 23).to(device)
+        model_input = (example_input, example_category, example_host, example_stats, example_seg)
+
     trace = torch.jit.trace(model, model_input)
     torch.jit.save(trace, out_file)
     print(f"Traced model (checkpoint - '{model_file}') to '{out_file}'", flush=True)

@@ -10,5 +10,6 @@ from .transformers import (
     TransformerFieldsDataset, 
     TransformersCollator, 
     TransformerMultipleFieldsDataset, 
-    TransformerFieldsDatasetWithCategoricalFeatures
+    TransformerFieldsDatasetWithCategoricalFeatures,
+    TFDCFSF,
 )

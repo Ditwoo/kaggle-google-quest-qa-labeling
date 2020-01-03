@@ -257,7 +257,110 @@ class TransformerFieldsDatasetWithCategoricalFeatures(TransformerFieldsDataset):
             "host": host_id,
             "targets": target,
         }
-        return res 
+        return res
+
+
+class TFDCFSF(TransformerFieldsDataset):
+    """
+    Transformer Dataset with fields, categorical features and statistical features.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.ctg_col = "category"
+        self.host_col = "host"
+        self.str_cols = ["question_title", "question_body", "answer"]
+
+    def _build_tokens(self, title, question, answer):
+        title_body_tokens = self.tokenizer.tokenize(title + "," + question)
+        num_title_body_tokens = len(title_body_tokens)
+        title_body_tokens = self._select_tokens(
+            title_body_tokens, 
+            max_num=MAX_QUESTION_LEN
+        )
+        ans_tokens = self.tokenizer.tokenize(answer)
+        num_ans_tokens = len(ans_tokens)
+        ans_tokens = self._select_tokens(
+            ans_tokens, 
+            max_num=MAX_ANSWER_LEN
+        )
+        tokens = ["[CLS]"] + title_body_tokens + ["[SEP]"] + ans_tokens + ["[SEP]"]
+        return tokens, (num_title_body_tokens, num_ans_tokens)
+
+    def _build_stats(self, 
+                     title: str, body: str, answer: str, 
+                     num_title_body_tokens: int, num_ans_tokens: int) -> list:
+        # (val - mean) / std
+        title_body_tokens = (num_title_body_tokens - 241) / 334
+        ans_tokens = (num_ans_tokens - 217) / 289
+        
+        title_str_len = (len(title) - 53) / 20
+        title_alpha_num = (sum(1 for c in title if c.isalpha()) - 43) / 16
+        title_nums_num = (sum(1 for c in title if c.isnumeric()) - 0) / 1
+        title_low_num = (sum(1 for c in title if c.islower()) - 40) / 16
+        title_upp_num = (sum(1 for c in title if c.isupper()) - 2) / 2
+        title_space_num = (sum(1 for c in title if c.isspace()) - 8) / 3
+        title_words_num = (len(title.split()) - 9) / 3
+
+        body_str_len = (len(body) - 834) / 1035
+        body_alpha_num = (sum(1 for c in title if c.isalpha()) - 591) / 663
+        body_nums_num = (sum(1 for c in title if c.isnumeric()) - 15) / 68
+        body_low_num = (sum(1 for c in title if c.islower()) - 558) / 608
+        body_upp_num = (sum(1 for c in title if c.isupper()) - 33) / 80
+        body_space_num = (sum(1 for c in title if c.isspace()) - 165) / 263
+        body_words_num = (len(body.split()) - 125) / 116
+        
+        answer_str_len = (len(body) - 843) / 1023
+        answer_alpha_num = (sum(1 for c in title if c.isalpha()) - 624) / 727
+        answer_nums_num = (sum(1 for c in title if c.isnumeric()) - 9) / 79
+        answer_low_num = (sum(1 for c in title if c.islower()) - 597) / 659
+        answer_upp_num = (sum(1 for c in title if c.isupper()) - 26) / 56
+        answer_space_num = (sum(1 for c in title if c.isspace()) - 157) / 232
+        answer_words_num = (len(answer.split()) - 133) / 156
+        
+        res_stats = [
+            title_body_tokens, ans_tokens, title_str_len, body_str_len, answer_str_len,
+            title_alpha_num, title_nums_num, title_low_num, title_upp_num, title_space_num, title_words_num,
+            body_alpha_num, body_nums_num, body_low_num, body_upp_num, body_space_num, body_words_num,
+            answer_alpha_num, answer_nums_num, answer_low_num, answer_upp_num, answer_space_num, answer_words_num,
+        ] # 23 stat features
+
+        return res_stats
+
+    def __getitem__(self, idx) -> dict:
+        index = self.df.index[idx]
+        title = self.df.at[index, "question_title"]
+        body = self.df.at[index, "question_body"]
+        answer = self.df.at[index, "answer"]
+        category = self.df.at[index, self.ctg_col]
+        category = CATEGORY_MAP[category if category in CATEGORY_MAP else "<unk>"]
+        host = self.df.at[index, self.host_col]
+        host = HOST_MAP[host if host in HOST_MAP else "<unk>"]
+        # combine fields into one sequence
+        tokens, (num_tb_tokens, num_a_tokens) = self._build_tokens(title, body, answer)
+        segments = self._build_segments(tokens)
+        token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+        # pad sequneces if needed
+        if len(token_ids) < MAX_LEN:
+            token_ids += [self.PAD] * (MAX_LEN - len(token_ids))
+        if len(segments) < MAX_LEN:
+            segments += [self.PAD] * (MAX_LEN - len(segments))
+        # converting to tensors
+        token_ids = torch.LongTensor(token_ids)
+        segments = torch.LongTensor(segments) 
+        category_id = torch.LongTensor([category])
+        host_id = torch.LongTensor([host])
+        stats = torch.FloatTensor(self._build_stats(title, body, answer, num_tb_tokens, num_a_tokens))
+        target = torch.FloatTensor([self.df.at[index, c] for c in self.target])
+        res = {
+            "sequences": token_ids, 
+            "segments": segments, 
+            "category": category_id,
+            "host": host_id,
+            "stats": stats,
+            "targets": target,
+        }
+        return res
 
 
 class TransformerMultipleFieldsDataset(Dataset):
