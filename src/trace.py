@@ -15,6 +15,7 @@ INPUT_TYPES = {
     "fields", 
     "transformers-categories",
     "transformers-categories-stats",
+    "roberta-categories-stats",
 }
 
 
@@ -58,7 +59,7 @@ def main():
         example_category = torch.randint(high=5, size=(1, 1)).to(device)
         example_host = torch.randint(high=5, size=(1, 1)).to(device)
         model_input = (example_input, example_category, example_host, example_seg)
-    else:
+    elif input_type == "transformers-categories-stats":
         example_input = torch.randint(low=1, high=10, size=(1, 512)).to(device)
         example_input[0, 0] = 101
         example_seg = torch.randint(low=0, high=2, size=(1, 512)).to(device)
@@ -66,6 +67,14 @@ def main():
         example_host = torch.randint(high=5, size=(1, 1)).to(device)
         example_stats = torch.randn(1, 23).to(device)
         model_input = (example_input, example_category, example_host, example_stats, example_seg)
+    else:
+        # roberta-categories-stats
+        example_input = torch.randint(low=1, high=10, size=(1, 512)).to(device)
+        example_input[0, 0] = 101
+        example_category = torch.randint(high=5, size=(1, 1)).to(device)
+        example_host = torch.randint(high=5, size=(1, 1)).to(device)
+        example_stats = torch.randn(1, 23).to(device)
+        model_input = (example_input, example_category, example_host, example_stats)
 
     trace = torch.jit.trace(model, model_input)
     torch.jit.save(trace, out_file)

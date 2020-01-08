@@ -12,4 +12,5 @@ from .transformers import (
     TransformerMultipleFieldsDataset, 
     TransformerFieldsDatasetWithCategoricalFeatures,
     TFDCFSF,
+    RFDCFSF,
 )

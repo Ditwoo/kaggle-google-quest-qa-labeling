@@ -234,18 +234,20 @@ class PTCFS(nn.Module):
                  num_categories: int,
                  num_hosts: int,
                  stats_dim: int,
-                 num_classes: int = 1):
+                 num_classes: int = 1,
+                 pad_token: int = 0):
         super(PTCFS, self).__init__()
+        self.pad_token = pad_token
         config = AutoConfig.from_pretrained(
             pretrain_dir, 
             num_labels=num_classes
         )
 
-        self.bert = AutoModel.from_pretrained(
+        self.base_model = AutoModel.from_pretrained(
             pretrain_dir, 
             config=config
         )
-        
+
         categories_emb_dim = 8
         self.categories_emb = nn.Embedding(num_categories, categories_emb_dim)
 
@@ -278,14 +280,17 @@ class PTCFS(nn.Module):
             stats     - torch.FloatTensor with values (text statistics)
             segments  - torch.LongTensor with segment indicators
         """
-        mask = (sequences > 0).float()
-        bert_output = self.bert(
+
+        # import pdb; pdb.set_trace()
+
+        mask = (sequences != self.pad_token).float()
+        bm_output = self.base_model(
             input_ids=sequences,
             attention_mask=mask,
             token_type_ids=segments,
-            head_mask=head_mask
+            # head_mask=head_mask
         )
-        hidden_state = bert_output[0]  # (bs, seq_len, dim)
+        hidden_state = bm_output[0]  # (bs, seq_len, dim)
         ctg_emb = self.categories_emb(category).squeeze(1) # (bs, dim)
         host_emb = self.hosts_emb(host).squeeze(1) # (bs, dim)
         stats_feats = self.stats_dense(stats) # (bs, dim)

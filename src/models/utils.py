@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import torch
 import torch.nn as nn
@@ -15,6 +16,10 @@ def patch_model_with_embedding(embedding_file: str, params: dict) -> nn.Module:
 
 
 def model_from_checkpoint(checkpoint: str, params: dict) -> nn.Module:
+    # if checkpoint name is uppercase word -> load checkpoint from this env variable
+    if checkpoint.isupper():
+        checkpoint = os.environ[checkpoint]
+
     model = registry.MODELS.get_from_params(**params)
 
     checkpoint = torch.load(checkpoint)

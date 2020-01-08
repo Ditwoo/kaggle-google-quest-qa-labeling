@@ -6,7 +6,13 @@ class Runner(SupervisedRunner):
         super().__init__(
             model=model, 
             device=device, 
-            input_key=["sequences", "segments", "category", "host", "stats"],
+            input_key=[
+                "sequences", 
+                # "segments", 
+                "category", 
+                "host", 
+                "stats",
+            ],
             # input_key=["sequences", "segments", "category", "host"],
             # input_key=["sequences", "segments"],
             # input_key=["question_title", "question_body", "answer"], 

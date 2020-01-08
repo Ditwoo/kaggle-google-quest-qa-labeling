@@ -1,12 +1,14 @@
 import os
 import pickle
 from collections import OrderedDict
+from copy import copy
 
 import numpy as np
 import torch
 import torch.nn as nn
 from catalyst.dl import ConfigExperiment
 from sklearn.model_selection import train_test_split
+from transformers import BertTokenizer, XLNetTokenizer, RobertaTokenizer
 
 from .datasets import (
     FieldsDataset,
@@ -18,6 +20,7 @@ from .datasets import (
     TransformerMultipleFieldsDataset,
     TransformerFieldsDatasetWithCategoricalFeatures,
     TFDCFSF,
+    RFDCFSF,
 )
 from .datasets.augmentations import (
     CombineSeqs, 
@@ -81,12 +84,15 @@ class Experiment(ConfigExperiment):
 
     def transformer_get_datasets(self,
                                  stage: str,
-                                 tokenizer_dir: str,
+                                 tokenizer: str,
                                  train_pickle: str = None,
                                  valid_pickle: str = None,
                                  **kwargs):
         if "TRAIN_PICKLE" in os.environ and os.environ["TRAIN_PICKLE"]:
             train_pickle = os.environ["TRAIN_PICKLE"]
+
+        tokenizer_cls = RobertaTokenizer
+        dataset_cls = RFDCFSF # TFDCFSF
 
         with open(train_pickle, "rb") as f:
             df = pickle.load(f)
@@ -94,10 +100,10 @@ class Experiment(ConfigExperiment):
         print(f"Train shapes - {df.shape}")
         datasets = OrderedDict()
         datasets["train"] = dict(
-            dataset=TFDCFSF(
+            dataset=RFDCFSF(
                 df=df, 
                 target=TARGETS, 
-                tokenizer_dir=tokenizer_dir,
+                tokenizer=tokenizer_cls.from_pretrained(tokenizer),
             ),
             shuffle=True,
         )
@@ -110,10 +116,10 @@ class Experiment(ConfigExperiment):
 
         print(f"Valid shapes - {df.shape}")
         datasets["valid"] = dict(
-            dataset=TFDCFSF(
+            dataset=RFDCFSF(
                 df=df, 
                 target=TARGETS, 
-                tokenizer_dir=tokenizer_dir,
+                tokenizer=tokenizer_cls.from_pretrained(tokenizer),
             ),
             shuffle=False,
         )
