@@ -11,6 +11,7 @@ from .transformers import (
     PooledLstmTransfModel,
     PooledTransfModelWithCatericalFeatures,
     PTCFS,
+    PTM,
 )
 from .utils import (
     patch_model_with_embedding, 

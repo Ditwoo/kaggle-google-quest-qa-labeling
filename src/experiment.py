@@ -21,6 +21,7 @@ from .datasets import (
     TransformerFieldsDatasetWithCategoricalFeatures,
     TFDCFSF,
     RFDCFSF,
+    XFDCFSF,
 )
 from .datasets.augmentations import (
     CombineSeqs, 
@@ -91,8 +92,8 @@ class Experiment(ConfigExperiment):
         if "TRAIN_PICKLE" in os.environ and os.environ["TRAIN_PICKLE"]:
             train_pickle = os.environ["TRAIN_PICKLE"]
 
-        tokenizer_cls = RobertaTokenizer
-        dataset_cls = RFDCFSF # TFDCFSF
+        tokenizer_cls = BertTokenizer
+        dataset_cls = TransformerFieldsDataset # XFDCFSF # RFDCFSF # TFDCFSF
 
         with open(train_pickle, "rb") as f:
             df = pickle.load(f)
@@ -100,7 +101,7 @@ class Experiment(ConfigExperiment):
         print(f"Train shapes - {df.shape}")
         datasets = OrderedDict()
         datasets["train"] = dict(
-            dataset=RFDCFSF(
+            dataset=dataset_cls(
                 df=df, 
                 target=TARGETS, 
                 tokenizer=tokenizer_cls.from_pretrained(tokenizer),
@@ -116,7 +117,7 @@ class Experiment(ConfigExperiment):
 
         print(f"Valid shapes - {df.shape}")
         datasets["valid"] = dict(
-            dataset=RFDCFSF(
+            dataset=dataset_cls(
                 df=df, 
                 target=TARGETS, 
                 tokenizer=tokenizer_cls.from_pretrained(tokenizer),
