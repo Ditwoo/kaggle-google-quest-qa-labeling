@@ -14,6 +14,7 @@ from .models import (
     PooledTransfModelWithCatericalFeatures,
     PTCFS,
     PTM,
+    PTC,
     patch_model_with_embedding,
     model_from_checkpoint,
     unfreezed_transf,
@@ -39,6 +40,7 @@ registry.Model(PooledLstmTransfModel)
 registry.Model(PooledTransfModelWithCatericalFeatures)
 registry.Model(PTCFS)
 registry.Model(PTM)
+registry.Model(PTC)
 # functions
 registry.Model(patch_model_with_embedding)
 registry.Model(model_from_checkpoint)

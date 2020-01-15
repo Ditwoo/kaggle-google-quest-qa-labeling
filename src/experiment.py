@@ -1,4 +1,5 @@
 import os
+import json
 import pickle
 from collections import OrderedDict
 from copy import copy
@@ -8,7 +9,7 @@ import torch
 import torch.nn as nn
 from catalyst.dl import ConfigExperiment
 from sklearn.model_selection import train_test_split
-from transformers import BertTokenizer, XLNetTokenizer, RobertaTokenizer
+from transformers import BertTokenizer, BertTokenizerFast, XLNetTokenizer, RobertaTokenizer
 
 from .datasets import (
     FieldsDataset,
@@ -22,6 +23,8 @@ from .datasets import (
     TFDCFSF,
     RFDCFSF,
     XFDCFSF,
+    FoldTFDCFSF,
+    FoldTFDCSF,
 )
 from .datasets.augmentations import (
     CombineSeqs, 
@@ -89,11 +92,25 @@ class Experiment(ConfigExperiment):
                                  train_pickle: str = None,
                                  valid_pickle: str = None,
                                  **kwargs):
+        if "STATS_CONFIG" in os.environ and os.environ["STATS_CONFIG"]:
+            stats_config = os.environ["STATS_CONFIG"]
+        else:
+            raise ValueError("There is no specified 'STATS_CONFIG' env variable!")
+            
+        
+        with open(stats_config, "r") as f:
+            stats_config = json.load(f)
+
+        # from pprint import pprint
+        # print()
+        # pprint(stats_config)
+        # print(flush=True)
+        
         if "TRAIN_PICKLE" in os.environ and os.environ["TRAIN_PICKLE"]:
             train_pickle = os.environ["TRAIN_PICKLE"]
 
         tokenizer_cls = BertTokenizer
-        dataset_cls = TransformerFieldsDataset # XFDCFSF # RFDCFSF # TFDCFSF
+        dataset_cls = FoldTFDCSF # FoldTFDCFSF # XFDCFSF # RFDCFSF # TFDCFSF
 
         with open(train_pickle, "rb") as f:
             df = pickle.load(f)
@@ -102,6 +119,7 @@ class Experiment(ConfigExperiment):
         datasets = OrderedDict()
         datasets["train"] = dict(
             dataset=dataset_cls(
+                stats_config,
                 df=df, 
                 target=TARGETS, 
                 tokenizer=tokenizer_cls.from_pretrained(tokenizer),
@@ -118,6 +136,7 @@ class Experiment(ConfigExperiment):
         print(f"Valid shapes - {df.shape}")
         datasets["valid"] = dict(
             dataset=dataset_cls(
+                stats_config,
                 df=df, 
                 target=TARGETS, 
                 tokenizer=tokenizer_cls.from_pretrained(tokenizer),

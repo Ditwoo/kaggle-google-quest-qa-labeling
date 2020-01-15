@@ -14,4 +14,6 @@ from .transformers import (
     TFDCFSF,
     RFDCFSF,
     XFDCFSF,
+    FoldTFDCFSF,
+    FoldTFDCSF,
 )

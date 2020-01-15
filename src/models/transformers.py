@@ -288,6 +288,81 @@ class PTM(nn.Module):
         return logits
 
 
+class PTC(nn.Module):
+    """
+    Pooled Transformer model with text statistics.
+    """
+    def __init__(self,
+                 pretrain_dir: str,
+                 stats_dim: int,
+                 num_classes: int = 1,
+                 pad_token: int = 0):
+        super(PTC, self).__init__()
+        self.pad_token = pad_token
+        config = AutoConfig.from_pretrained(
+            pretrain_dir, 
+            num_labels=num_classes
+        )
+        if hasattr(config, "hidden_dropout_prob"):
+            dropout = config.hidden_dropout_prob
+        elif hasattr(config, "dropout"):
+            dropout = config.dropout
+        else:
+            dropout = 0.1
+
+        self.base_model = AutoModel.from_pretrained(
+            pretrain_dir, 
+            config=config
+        )
+
+        stats_hidden_dim = 64
+        self.stats_dense = nn.Sequential(
+            nn.Linear(stats_dim, 64),
+            nn.ReLU(True),
+        )
+
+        self.pre_classifier = nn.Linear(
+            config.hidden_size * 2 + stats_hidden_dim, 
+            config.hidden_size
+        )
+        self.classifier = nn.Sequential(
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(config.hidden_size, num_classes)
+        )
+    
+    def forward(self, sequences, stats, segments=None, head_mask=None):
+        """
+        Inputs:
+            sequences - torch.LongTensor with tokens
+            category  - torch.LongTensor with 1 category for each element of batch
+            host      - torch.LongTensor with 1 host for each element of batch
+            stats     - torch.FloatTensor with values (text statistics)
+            segments  - torch.LongTensor with segment indicators
+        """
+
+        # import pdb; pdb.set_trace()
+
+        mask = (sequences != self.pad_token).float()
+        bm_output = self.base_model(
+            input_ids=sequences,
+            attention_mask=mask,
+            token_type_ids=segments,
+            # head_mask=head_mask
+        )
+        hidden_state = bm_output[0]  # (bs, seq_len, dim)
+        stats_feats = self.stats_dense(stats) # (bs, dim)
+
+        pooled_output = torch.cat([
+            torch.max(hidden_state, 1)[0],
+            torch.mean(hidden_state, 1),
+            stats_feats
+        ], 1) # (bs, dim)
+        pooled_output = self.pre_classifier(pooled_output)  # (bs, dim)
+        logits = self.classifier(pooled_output)  # (bs, dim)
+        return logits
+
+
 class PTCFS(nn.Module):
     """
     Pooled Transformer model with categorical features (category & host features) and text statistics.

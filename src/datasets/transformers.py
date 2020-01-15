@@ -438,6 +438,206 @@ class XFDCFSF(TFDCFSF):
         }
 
 
+class Stats:
+    def __init__(self, config: dict = None):
+        if config is None:
+            config = {
+                "num_title_body_tokens": {"mean": 0, "std": 1},
+                "num_ans_tokens": {"mean": 0, "std": 1},
+                "title": {
+                    "text_len": {"mean": 0, "std": 1},
+                    "alpha_num": {"mean": 0, "std": 1},
+                    "nums_num": {"mean": 0, "std": 1},
+                    "low_num": {"mean": 0, "std": 1},
+                    "upp_num": {"mean": 0, "std": 1},
+                    "space_num": {"mean": 0, "std": 1},
+                    "words_num": {"mean": 0, "std": 1},
+                },
+                "body": {
+                    "text_len": {"mean": 0, "std": 1},
+                    "alpha_num": {"mean": 0, "std": 1},
+                    "nums_num": {"mean": 0, "std": 1},
+                    "low_num": {"mean": 0, "std": 1},
+                    "upp_num": {"mean": 0, "std": 1},
+                    "space_num": {"mean": 0, "std": 1},
+                    "words_num": {"mean": 0, "std": 1},
+                },
+                "answer": {
+                    "text_len": {"mean": 0, "std": 1},
+                    "alpha_num": {"mean": 0, "std": 1},
+                    "nums_num": {"mean": 0, "std": 1},
+                    "low_num": {"mean": 0, "std": 1},
+                    "upp_num": {"mean": 0, "std": 1},
+                    "space_num": {"mean": 0, "std": 1},
+                    "words_num": {"mean": 0, "std": 1},
+                },
+                "host": [],
+                "category": [],
+            }
+        self.config = config
+
+    @staticmethod
+    def normalize(val, mean, std) -> float:
+        return (val - mean) / std
+
+    def _compute_pack_of_str_metrics(self, text: str, c: dict) -> list:
+
+        str_len = self.normalize(len(text), **c["text_len"])
+        alpha_num = self.normalize(sum(1 for c in text if c.isalpha()), **c["alpha_num"])
+        nums_num = self.normalize(sum(1 for c in text if c.isnumeric()), **c["nums_num"])
+        low_num = self.normalize(sum(1 for c in text if c.islower()), **c["low_num"])
+        upp_num = self.normalize(sum(1 for c in text if c.isupper()), **c["upp_num"])
+        space_num = self.normalize(sum(1 for c in text if c.isspace()), **c["space_num"])
+        words_num = self.normalize(len(text.split()), **c["words_num"])
+
+        return [str_len, alpha_num, nums_num, low_num, upp_num, space_num, words_num]
+
+
+    def build_stats(self, 
+                    title: str, body: str, answer: str, 
+                    num_title_body_tokens: int, num_ans_tokens: int) -> list:
+        c = self.config
+        title_body_tokens = self.normalize(num_title_body_tokens, **c["num_title_body_tokens"])
+        ans_tokens = self.normalize(num_ans_tokens, **c["num_ans_tokens"])
+
+        title_stats = self._compute_pack_of_str_metrics(title, self.config["title"])
+        body_stats = self._compute_pack_of_str_metrics(title, self.config["body"])
+        ans_stats = self._compute_pack_of_str_metrics(title, self.config["answer"])
+
+        stats = [title_body_tokens, ans_tokens] + title_stats + body_stats + ans_stats
+        return stats  # 23 features
+
+    def build_stats_and_categories(self,
+        title: str, body: str, answer: str, host: str, category: str,
+        num_title_body_tokens: int, num_ans_tokens: int) -> list:
+        stats = self.build_stats(title, body, answer, num_title_body_tokens, num_ans_tokens)
+        te_host = self.config["host"].get(host, self.config["host"]["<unk>"])
+        te_category = self.config["category"].get(category, self.config["category"]["<unk>"])
+
+        return stats + te_host + te_category  # 83
+
+
+class FoldTFDCFSF(TransformerFieldsDataset):
+    """
+    Fold Transformer Dataset based on data fields, categorical features and statistical features.
+    Stats normalization parameters will be loaded from 'stats_config' dict
+    """
+
+    def __init__(self, stats_config: dict, **kwargs):
+        super().__init__(**kwargs)
+        self.ctg_col = "category"
+        self.host_col = "host"
+        self.str_cols = ["question_title", "question_body", "answer"]
+        self.pre_pad = False
+        self.stats_cfg: Stats = Stats(stats_config)
+
+    def build_stats(self, 
+                    title: str, body: str, answer: str, 
+                    num_title_body_tokens: int, num_ans_tokens: int) -> list:
+        return self.stats_cfg.build_stats(title, body, answer, num_title_body_tokens, num_ans_tokens)
+
+    def build_tokens_and_segments(self, title, question, answer):
+        title_body_tokens = self.tokenizer.tokenize(title + "," + question)
+        num_title_body_tokens = len(title_body_tokens)
+        title_body_tokens = self._select_tokens(
+            title_body_tokens, 
+            max_num=MAX_QUESTION_LEN
+        )
+        ans_tokens = self.tokenizer.tokenize(answer)
+        num_ans_tokens = len(ans_tokens)
+        ans_tokens = self._select_tokens(
+            ans_tokens, 
+            max_num=MAX_ANSWER_LEN
+        )
+        first_part = [self.tokenizer.cls_token] + title_body_tokens + [self.tokenizer.sep_token] 
+        second_part = ans_tokens + [self.tokenizer.sep_token]
+        segments = [0] * len(first_part) + [1] * len(second_part)
+        tokens = first_part + second_part
+        return tokens, segments, (num_title_body_tokens, num_ans_tokens)
+
+    def __getitem__(self, idx) -> dict:
+        index = self.df.index[idx]
+        title = self.df.at[index, "question_title"]
+        body = self.df.at[index, "question_body"]
+        answer = self.df.at[index, "answer"]
+        category = self.df.at[index, self.ctg_col]
+        category = CATEGORY_MAP[category if category in CATEGORY_MAP else "<unk>"]
+        host = self.df.at[index, self.host_col]
+        host = HOST_MAP[host if host in HOST_MAP else "<unk>"]
+        # combine fields into one sequence
+        tokens, segments, (num_tb_tokens, num_a_tokens) = self.build_tokens_and_segments(title, body, answer)
+        token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+        # pad sequneces if needed
+        token_ids = self.pad_foo(token_ids, MAX_LEN)
+        segments = self.pad_foo(segments, MAX_LEN)
+        # converting to tensors
+        token_ids = torch.LongTensor(token_ids)
+        segments = torch.LongTensor(segments)
+        category_id = torch.LongTensor([category])
+        host_id = torch.LongTensor([host])
+        stats = torch.FloatTensor(self.build_stats(title, body, answer, num_tb_tokens, num_a_tokens))
+        target = torch.FloatTensor([self.df.at[index, c] for c in self.target])
+        res = {
+            "sequences": token_ids, 
+            "segments": segments, 
+            "category": category_id,
+            "host": host_id,
+            "stats": stats,
+            "targets": target,
+        }
+        return res
+
+
+class FoldTFDCSF(FoldTFDCFSF):
+    """
+    Fold Transformer Dataset based on data fields, categorical features as target encoded vectors 
+    and statistical features.
+    Stats normalization parameters will be loaded from 'stats_config' dict
+    """
+
+    def build_stats(self, 
+                    title: str, body: str, answer: str, host: str, category: str,
+                    num_title_body_tokens: int, num_ans_tokens: int) -> list:
+        return self.stats_cfg.build_stats_and_categories(
+            title, body, answer, host, category, num_title_body_tokens, num_ans_tokens
+        )
+
+
+    def __getitem__(self, idx) -> dict:
+        index = self.df.index[idx]
+        title = self.df.at[index, "question_title"]
+        body = self.df.at[index, "question_body"]
+        answer = self.df.at[index, "answer"]
+        category = self.df.at[index, self.ctg_col]
+        # category = CATEGORY_MAP[category if category in CATEGORY_MAP else "<unk>"]
+        host = self.df.at[index, self.host_col]
+        # host = HOST_MAP[host if host in HOST_MAP else "<unk>"]
+        # combine fields into one sequence
+        tokens, segments, (num_tb_tokens, num_a_tokens) = self.build_tokens_and_segments(title, body, answer)
+        token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+        # pad sequneces if needed
+        token_ids = self.pad_foo(token_ids, MAX_LEN)
+        segments = self.pad_foo(segments, MAX_LEN)
+        # converting to tensors
+        token_ids = torch.LongTensor(token_ids)
+        segments = torch.LongTensor(segments)
+        # category_id = torch.LongTensor([category])
+        # host_id = torch.LongTensor([host])
+        stats = torch.FloatTensor(
+            self.build_stats(title, body, answer, host, category, num_tb_tokens, num_a_tokens)
+        )
+        target = torch.FloatTensor([self.df.at[index, c] for c in self.target])
+        res = {
+            "sequences": token_ids, 
+            "segments": segments, 
+            # "category": category_id,
+            # "host": host_id,
+            "stats": stats,
+            "targets": target,
+        }
+        return res
+
+
 class TransformerMultipleFieldsDataset(Dataset):
     def __init__(self, 
                  df: DataFrame,

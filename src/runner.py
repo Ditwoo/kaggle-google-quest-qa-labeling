@@ -11,7 +11,7 @@ class Runner(SupervisedRunner):
                 "segments", 
                 # "category", 
                 # "host", 
-                # "stats",
+                "stats",
             ],
             # input_key=["question_title", "question_body", "answer"], 
             # input_key=["question_title", "question_body", "answer", "category", "host"], 
