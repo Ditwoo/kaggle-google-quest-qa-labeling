@@ -7,13 +7,13 @@ class Runner(SupervisedRunner):
             model=model, 
             device=device, 
             input_key=[
+                # "question", 
+                # "answer", 
                 "sequences", 
-                "segments", 
+                # "segments", 
                 # "category", 
                 # "host", 
-                "stats",
+                # "stats",
             ],
-            # input_key=["question_title", "question_body", "answer"], 
-            # input_key=["question_title", "question_body", "answer", "category", "host"], 
             # output_key="logits",
         )

@@ -15,6 +15,8 @@ from .models import (
     PTCFS,
     PTM,
     PTC,
+    TwoSidedPooledTransformer,
+    PCTCFS,
     patch_model_with_embedding,
     model_from_checkpoint,
     unfreezed_transf,
@@ -41,6 +43,8 @@ registry.Model(PooledTransfModelWithCatericalFeatures)
 registry.Model(PTCFS)
 registry.Model(PTM)
 registry.Model(PTC)
+registry.Model(TwoSidedPooledTransformer)
+registry.Model(PCTCFS)
 # functions
 registry.Model(patch_model_with_embedding)
 registry.Model(model_from_checkpoint)

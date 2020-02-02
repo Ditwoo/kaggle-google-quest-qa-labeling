@@ -1,13 +1,8 @@
 model_params:
-  model: PTC
-  pretrain_dir: bert-base-uncased
-  stats_dim: 83
+  model: PTM
+  pretrain_dir: distilbert-base-uncased
   num_classes: 30
   pad_token: 0
-
-# distributed_params:
-#   opt_level: O1
-#   syncbn: True
 
 stages:
   state_params:
@@ -15,9 +10,9 @@ stages:
     minimize_metric: False
 
   data_params:
-    num_workers: &nw 6
+    num_workers: &nw 8
     batch_size: *nw
-    tokenizer: bert-base-uncased
+    tokenizer: distilbert-base-uncased
 
   criterion_params:
     criterion: BCEWithLogitsLoss
@@ -50,7 +45,7 @@ stages:
     
     optimizer_params:
       optimizer: Adam
-      lr: 0.00001
+      lr: 0.00003
 
   stage2:
     state_params:
@@ -58,7 +53,7 @@ stages:
     
     optimizer_params:
       optimizer: Adam
-      lr: 0.000005
+      lr: 0.00001 # 0.000005
   
   stage3:
     state_params:

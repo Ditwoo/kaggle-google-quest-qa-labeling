@@ -1,4 +1,7 @@
+import html
+import re
 from math import floor, ceil
+from itertools import product
 import numpy as np
 import torch
 from functools import partial
@@ -109,10 +112,7 @@ class TransformerFieldsDataset(Dataset):
         self.pre_pad = pre_pad
         self.pad_foo = self._pad_foo
 
-    def _pad_foo(self, 
-                 tokens_list, 
-                 max_size, 
-                 pad_value=None) -> list:
+    def _pad_foo(self, tokens_list, max_size, pad_value=None) -> list:
         """
         Arguments:
             tokens_list - list of strings (tokens)
@@ -146,21 +146,26 @@ class TransformerFieldsDataset(Dataset):
             return tokens[:max_num // 2] + tokens[-(max_num - max_num // 2):]
 
     def build_tokens_and_segments(self, title, question, answer):
-        title_body_tokens = self.tokenizer.tokenize(title + "," + question)
-        title_body_tokens = self._select_tokens(
-            title_body_tokens, 
-            max_num=MAX_QUESTION_LEN
-        )
-        ans_tokens = self.tokenizer.tokenize(answer)
-        ans_tokens = self._select_tokens(
-            ans_tokens, 
-            max_num=MAX_ANSWER_LEN
-        )
-        first_part = [self.tokenizer.cls_token] + title_body_tokens + [self.tokenizer.sep_token] 
-        second_part = ans_tokens + [self.tokenizer.sep_token]
-        segments = [0] * len(first_part) + [1] * len(second_part)
-        tokens = first_part + second_part
-        return tokens, segments
+        """
+        Input will be represented as: 
+        <CLS> {title & question token ids} <SEP> {asnwer token ids} <SEP>
+
+        With mask:
+        0 ............................... 0  1 ...................... 1
+        """
+
+        # first part of input
+        title_body_tokens = self.tokenizer.tokenize(title + " " + question)  # list of tokens (strings)
+        title_body_tokens = self._select_tokens(title_body_tokens, MAX_QUESTION_LEN)  # list of tokens (strings)
+        title_body_tokens_ids = self.tokenizer.convert_tokens_to_ids(title_body_tokens)  # list of integers
+        # second part of input
+        ans_tokens = self.tokenizer.tokenize(answer)  # list of tokens (strings)
+        ans_tokens = self._select_tokens(ans_tokens, MAX_ANSWER_LEN)  # list of tokens (strings)
+        ans_tokens_ids = self.tokenizer.convert_tokens_to_ids(ans_tokens)  # list of integers
+        # outputs
+        token_ids = self.tokenizer.build_inputs_with_special_tokens(title_body_tokens_ids, ans_tokens_ids)  # list of integers
+        segments = self.tokenizer.create_token_type_ids_from_sequences(title_body_tokens_ids, ans_tokens_ids)  # list of integers
+        return token_ids, segments
 
     def __getitem__(self, idx):
         index = self.df.index[idx]
@@ -168,11 +173,10 @@ class TransformerFieldsDataset(Dataset):
         body = self.df.at[index, "question_body"]
         answer = self.df.at[index, "answer"]
         # combine fields into one sequence
-        tokens, segments = self.build_tokens_and_segments (title, body, answer)
-        token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+        token_ids, segments = self.build_tokens_and_segments(title, body, answer)
         # pad sequneces if needed
-        token_ids = self.pad_foo(token_ids, MAX_LEN)
-        segments = self.pad_foo(segments, MAX_LEN)
+        token_ids = self._pad_foo(token_ids, MAX_LEN, self.tokenizer.pad_token_id)
+        segments = self._pad_foo(segments, MAX_LEN, self.tokenizer.pad_token_id)
         # converting to tensors
         token_ids = torch.LongTensor(token_ids)
         segments = torch.LongTensor(segments) 
@@ -201,8 +205,7 @@ class TransformerFieldsDatasetWithCategoricalFeatures(TransformerFieldsDataset):
         host = self.df.at[index, self.host_col]
         host = HOST_MAP[host if host in HOST_MAP else "<unk>"]
         # combine fields into one sequence
-        tokens, segments = self.build_tokens_and_segments (title, body, answer)
-        token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+        token_ids, segments = self.build_tokens_and_segments(title, body, answer)
         # pad sequneces if needed
         token_ids = self.pad_foo(token_ids, MAX_LEN)
         segments = self.pad_foo(segments, MAX_LEN)
@@ -235,6 +238,14 @@ class TFDCFSF(TransformerFieldsDataset):
         self.pre_pad = False
 
     def build_tokens_and_segments(self, title, question, answer):
+        """
+        Input will be represented as: 
+        <CLS> {title & question tokens} <SEP> {asnwer tokens} <SEP>
+
+        With mask:
+        0 ............................ 0  1 ................... 1
+        """
+
         title_body_tokens = self.tokenizer.tokenize(title + "," + question)
         num_title_body_tokens = len(title_body_tokens)
         title_body_tokens = self._select_tokens(
@@ -335,6 +346,13 @@ class RFDCFSF(TFDCFSF):
         self.pre_pad = False
 
     def build_tokens_and_segments(self, title, question, answer):
+        """
+        Input will be represented as: 
+        <CLS> {title & question tokens} <SEP> <SEP> {asnwer tokens} <SEP>
+
+        With mask:
+        0 ............................... 0     0  1 ................ 1
+        """
         title_body_tokens = self.tokenizer.tokenize(title + "," + question)
         num_title_body_tokens = len(title_body_tokens)
         title_body_tokens = self._select_tokens(
@@ -391,6 +409,13 @@ class XFDCFSF(TFDCFSF):
         self.pre_pad = True
 
     def build_tokens_and_segments(self, title, question, answer):
+        """
+        Input will be represented as: 
+        {title & question token ids} <SEP> {asnwer token ids} <SEP> <CLS>
+
+        With mask:
+        0 .......................... 0 1  0 ................. 0 1     1
+        """
         title_body_tokens = self.tokenizer.tokenize(title + "," + question)
         num_title_body_tokens = len(title_body_tokens)
         title_body_tokens = self._select_tokens(
@@ -537,23 +562,27 @@ class FoldTFDCFSF(TransformerFieldsDataset):
         return self.stats_cfg.build_stats(title, body, answer, num_title_body_tokens, num_ans_tokens)
 
     def build_tokens_and_segments(self, title, question, answer):
-        title_body_tokens = self.tokenizer.tokenize(title + "," + question)
+        """
+        Input will be represented as: 
+        <CLS> {title & question token ids} <SEP> {asnwer token ids} <SEP>
+
+        With mask:
+        0 ............................... 0  1 ...................... 1
+        """
+        # first part of input
+        title_body_tokens = self.tokenizer.tokenize(title + "," + question)  # list of tokens (strings)
         num_title_body_tokens = len(title_body_tokens)
-        title_body_tokens = self._select_tokens(
-            title_body_tokens, 
-            max_num=MAX_QUESTION_LEN
-        )
-        ans_tokens = self.tokenizer.tokenize(answer)
+        title_body_tokens = self._select_tokens(title_body_tokens, MAX_QUESTION_LEN)  # list of tokens (strings)
+        title_body_tokens_ids = self.tokenizer.convert_tokens_to_ids(title_body_tokens)  # list of integers
+        # second part of input
+        ans_tokens = self.tokenizer.tokenize(answer)  # list of tokens (strings)
         num_ans_tokens = len(ans_tokens)
-        ans_tokens = self._select_tokens(
-            ans_tokens, 
-            max_num=MAX_ANSWER_LEN
-        )
-        first_part = [self.tokenizer.cls_token] + title_body_tokens + [self.tokenizer.sep_token] 
-        second_part = ans_tokens + [self.tokenizer.sep_token]
-        segments = [0] * len(first_part) + [1] * len(second_part)
-        tokens = first_part + second_part
-        return tokens, segments, (num_title_body_tokens, num_ans_tokens)
+        ans_tokens = self._select_tokens(ans_tokens, MAX_ANSWER_LEN)  # list of tokens (strings)
+        ans_tokens_ids = self.tokenizer.convert_tokens_to_ids(ans_tokens)  # list of integers
+        # outputs
+        token_ids = self.tokenizer.build_inputs_with_special_tokens(title_body_tokens_ids, ans_tokens_ids)  # list of integers
+        segments = self.tokenizer.create_token_type_ids_from_sequences(title_body_tokens_ids, ans_tokens_ids)  # list of integers
+        return token_ids, segments, (num_title_body_tokens, num_ans_tokens)
 
     def __getitem__(self, idx) -> dict:
         index = self.df.index[idx]
@@ -565,8 +594,7 @@ class FoldTFDCFSF(TransformerFieldsDataset):
         host = self.df.at[index, self.host_col]
         host = HOST_MAP[host if host in HOST_MAP else "<unk>"]
         # combine fields into one sequence
-        tokens, segments, (num_tb_tokens, num_a_tokens) = self.build_tokens_and_segments(title, body, answer)
-        token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+        token_ids, segments, (num_tb_tokens, num_a_tokens) = self.build_tokens_and_segments(title, body, answer)
         # pad sequneces if needed
         token_ids = self.pad_foo(token_ids, MAX_LEN)
         segments = self.pad_foo(segments, MAX_LEN)
@@ -600,7 +628,7 @@ class FoldTFDCSF(FoldTFDCFSF):
                     num_title_body_tokens: int, num_ans_tokens: int) -> list:
         return self.stats_cfg.build_stats_and_categories(
             title, body, answer, host, category, num_title_body_tokens, num_ans_tokens
-        )
+        ) # 83 numbers
 
 
     def __getitem__(self, idx) -> dict:
@@ -608,21 +636,22 @@ class FoldTFDCSF(FoldTFDCFSF):
         title = self.df.at[index, "question_title"]
         body = self.df.at[index, "question_body"]
         answer = self.df.at[index, "answer"]
+
         category = self.df.at[index, self.ctg_col]
-        # category = CATEGORY_MAP[category if category in CATEGORY_MAP else "<unk>"]
+        category = CATEGORY_MAP[category if category in CATEGORY_MAP else "<unk>"]
+
         host = self.df.at[index, self.host_col]
-        # host = HOST_MAP[host if host in HOST_MAP else "<unk>"]
+        host = HOST_MAP[host if host in HOST_MAP else "<unk>"]
         # combine fields into one sequence
-        tokens, segments, (num_tb_tokens, num_a_tokens) = self.build_tokens_and_segments(title, body, answer)
-        token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+        token_ids, segments, (num_tb_tokens, num_a_tokens) = self.build_tokens_and_segments(title, body, answer)
         # pad sequneces if needed
         token_ids = self.pad_foo(token_ids, MAX_LEN)
         segments = self.pad_foo(segments, MAX_LEN)
         # converting to tensors
         token_ids = torch.LongTensor(token_ids)
         segments = torch.LongTensor(segments)
-        # category_id = torch.LongTensor([category])
-        # host_id = torch.LongTensor([host])
+        category_id = torch.LongTensor([category])
+        host_id = torch.LongTensor([host])
         stats = torch.FloatTensor(
             self.build_stats(title, body, answer, host, category, num_tb_tokens, num_a_tokens)
         )
@@ -630,9 +659,433 @@ class FoldTFDCSF(FoldTFDCFSF):
         res = {
             "sequences": token_ids, 
             "segments": segments, 
-            # "category": category_id,
-            # "host": host_id,
+            "category": category_id,
+            "host": host_id,
             "stats": stats,
+            "targets": target,
+        }
+        return res
+
+
+class JoinedTransformerFieldsDataset(Dataset):
+    def __init__(self, 
+                 df: DataFrame,
+                 target: List[str],
+                 tokenizer: BasicTokenizer,
+                 field: str = None,
+                 train_mode: bool = True,
+                 pre_pad: bool = False,
+                 **kwargs):
+        self.df: DataFrame = df
+        self.target = target
+        self.field = field
+        self.train_mode = train_mode
+        self.tokenizer = tokenizer
+        self.PAD = self.tokenizer.pad_token_id
+        self.PAD_TOKEN = self.tokenizer.pad_token
+        self.pre_pad = pre_pad
+        self.data = []
+        self.init_data()
+
+    def pad_foo(self, tokens_list, max_size, pad_value=None) -> list:
+        """
+        Arguments:
+            tokens_list - list of strings (tokens)
+            max_size - int, maximal size of sequnece
+            pad_value - str, value to use for padding, if not specified then will be used pad value from tokenizer
+            pre_pad - use padding before sequence (<pad>, ... <pad>, begin, ..., end) or after sequence (begin, ..., end, <pad>, ..., <pad>)
+        """
+        pad_value = self.PAD if pad_value is None else pad_value
+        _PAD = []
+        if len(tokens_list) < max_size:
+            _PAD = [pad_value] * (max_size - len(tokens_list))
+
+        if self.pre_pad:
+            tokens_list = _PAD + tokens_list 
+        else:
+            tokens_list = tokens_list + _PAD
+
+        return tokens_list
+
+    def __len__(self):
+        return len(self.data)
+
+    def _select_tokens(self, tokens, max_num):
+        if len(tokens) <= max_num:
+            return tokens
+        if self.train_mode:
+            num_remove = len(tokens) - max_num
+            remove_start = np.random.randint(0, len(tokens) - num_remove - 1)
+            return tokens[:remove_start] + tokens[remove_start + num_remove:]
+        else:
+            return tokens[:max_num // 2] + tokens[-(max_num - max_num // 2):]
+
+    def parts(self, sequence: list, step: int, stride: int) -> list:
+        return [sequence[i:i + step] for i in range(0, len(sequence), stride)]
+
+    def build_tokens_and_segments(self, title: str, question: str, answer: str):
+        """
+        Used only in test mode (train_mode == False).
+        """
+        title_body_tokens = self.tokenizer.tokenize(title + "," + question)
+        title_body_tokens = self._select_tokens(
+            title_body_tokens, 
+            max_num=MAX_QUESTION_LEN
+        )
+        ans_tokens = self.tokenizer.tokenize(answer)
+        ans_tokens = self._select_tokens(
+            ans_tokens, 
+            max_num=MAX_ANSWER_LEN
+        )
+        first_part = [self.tokenizer.cls_token] + title_body_tokens + [self.tokenizer.sep_token] 
+        second_part = ans_tokens + [self.tokenizer.sep_token]
+        segments = [0] * len(first_part) + [1] * len(second_part)
+        tokens = first_part + second_part
+        return tokens, segments
+
+    def init_data(self):
+        data = []
+        for index in self.df.index:
+            title = self.df.at[index, "question_title"]
+            body = self.df.at[index, "question_body"]
+            answer = self.df.at[index, "answer"]
+            target_vec = [self.df.at[index, c] for c in self.target]
+            if self.train_mode:
+                records = []
+                # generating multiple records from 1 sample
+                title_body_parts = self.parts(
+                    self.tokenizer.tokenize(title + "," + body),
+                    step=MAX_QUESTION_LEN,
+                    stride=128,
+                )
+                ans_parts = self.parts(
+                    self.tokenizer.tokenize(answer), 
+                    step=MAX_ANSWER_LEN,
+                    stride=128,
+                )
+                for tb, a in product(title_body_parts, ans_parts):
+                    title_body_tokens = self._select_tokens(tb, max_num=MAX_QUESTION_LEN)
+                    ans_tokens = self._select_tokens(a, max_num=MAX_ANSWER_LEN)
+                    first_part = [self.tokenizer.cls_token] + title_body_tokens + [self.tokenizer.sep_token] 
+                    second_part = ans_tokens + [self.tokenizer.sep_token]
+                    segments = [0] * len(first_part) + [1] * len(second_part)
+                    token_ids = self.tokenizer.convert_tokens_to_ids(first_part + second_part)
+                    # pad sequneces if needed
+                    token_ids = self.pad_foo(token_ids, MAX_LEN, self.tokenizer.pad_token_id)
+                    segments = self.pad_foo(segments, MAX_LEN, self.tokenizer.pad_token_id)
+                    # converting to tensors
+                    token_ids = torch.LongTensor(token_ids)
+                    segments = torch.LongTensor(segments) 
+                    target = torch.FloatTensor(target_vec)
+                    records.append({
+                        "sequences": token_ids, 
+                        "segments": segments, 
+                        "targets": target
+                    })
+                data.extend(records)
+            else:
+                # combine fields into one sequence
+                tokens, segments = self.build_tokens_and_segments(title, body, answer)
+                token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+                # pad sequneces if needed
+                token_ids = self.pad_foo(token_ids, MAX_LEN, self.tokenizer.pad_token_id)
+                segments = self.pad_foo(segments, MAX_LEN, self.tokenizer.pad_token_id)
+                # converting to tensors
+                token_ids = torch.LongTensor(token_ids)
+                segments = torch.LongTensor(segments) 
+                target = torch.FloatTensor(target_vec)
+                data.append({
+                    "sequences": token_ids, 
+                    "segments": segments, 
+                    "targets": target
+                })
+        self.data = data
+
+    def __getitem__(self, idx) -> dict:
+        return self.data[idx]
+
+
+class TFDCC(TransformerFieldsDataset):
+    """
+    Transformer Dataset with code cleaning.
+    """
+
+    @staticmethod
+    def clean_text(text: str) -> str:
+        # # code in spaces
+        # text = re.sub(r"(e\.g\.| |\?|this|:|;|output)(\n{2,3}([\s\S]+?\n)\n{2})", "\1 code ", text)
+        
+        text = html.unescape(text)
+        text = re.sub(r"\<[\s\S]+?\>", " code block ", text)
+        
+        # text = re.sub(r"((if|for)\W*\([\s\S]+?\)\W\{[\s\S]+\}|\{[\s\S]+\})", " code block ", text)
+        # text = re.sub(r"( \$[\S]+ |\$[\s\S]+?;\n)", " code ", text)
+        # text = re.sub(r"\/\/[\s\S]+?\n", " code comment ", text)
+        # text = re.sub(r"\#[\s\S]+?\n", " code comment ", text)
+        # text = re.sub(r"\/\*[\s\S]+\/\*", " code comment ", text)
+        # text = re.sub(r"\([\s\S\W]+?\)\W+\{[\s\S]+\}", " function ", text)
+
+        # latex equations
+        text = re.sub(r" ?(\$[\s\S]+?\$|\$\$[\s\S]+?\$\$) ", " equation ", text)
+
+        return text
+
+    @staticmethod
+    def glue_title_and_question(t: str, q: str) -> str:
+        t = t.strip()
+        last_char = t[-1]
+        sep_symbol = " " if last_char in {".", ",", ":", ";", "?", "!", "-"} else ","
+        return t + sep_symbol + q
+
+    def build_tokens_and_segments(self, title, question, answer):
+        question = self.clean_text(question)
+        answer = self.clean_text(answer)
+        # first part of input
+        title_body_tokens = self.tokenizer.tokenize(self.glue_title_and_question(title, question))  # list of tokens (strings)
+        title_body_tokens = self._select_tokens(title_body_tokens, MAX_QUESTION_LEN)  # list of tokens (strings)
+        title_body_tokens_ids = self.tokenizer.convert_tokens_to_ids(title_body_tokens)  # list of integers
+        # second part of input
+        ans_tokens = self.tokenizer.tokenize(answer)  # list of tokens (strings)
+        ans_tokens = self._select_tokens(ans_tokens, MAX_ANSWER_LEN)  # list of tokens (strings)
+        ans_tokens_ids = self.tokenizer.convert_tokens_to_ids(ans_tokens)  # list of integers
+        # outputs
+        token_ids = self.tokenizer.build_inputs_with_special_tokens(title_body_tokens_ids, ans_tokens_ids)  # list of integers
+        segments = self.tokenizer.create_token_type_ids_from_sequences(title_body_tokens_ids, ans_tokens_ids)  # list of integers
+        return token_ids, segments
+
+
+class QuestionAnswerDataset(Dataset):
+    def __init__(self, 
+                 df: DataFrame,
+                 target: List[str],
+                 tokenizer: BasicTokenizer,
+                 mode: str,  # "question" or "answer"
+                 train_mode: bool = True,
+                 pre_pad: bool = False,
+                 **kwargs):
+        self.df: DataFrame = df
+        self.target = target
+        self.train_mode = train_mode
+        self.tokenizer = tokenizer
+        self.PAD = self.tokenizer.pad_token_id
+        self.PAD_TOKEN = self.tokenizer.pad_token
+        self.pre_pad = pre_pad
+        self.mode = mode
+
+    def pad_foo(self, tokens_list, max_size, pad_value=None) -> list:
+        """
+        Arguments:
+            tokens_list - list of strings (tokens)
+            max_size - int, maximal size of sequnece
+            pad_value - str, value to use for padding, if not specified then will be used pad value from tokenizer
+            pre_pad - use padding before sequence (<pad>, ... <pad>, begin, ..., end) or after sequence (begin, ..., end, <pad>, ..., <pad>)
+        """
+        pad_value = self.PAD if pad_value is None else pad_value
+        _PAD = []
+        if len(tokens_list) < max_size:
+            _PAD = [pad_value] * (max_size - len(tokens_list))
+        if self.pre_pad:
+            tokens_list = _PAD + tokens_list
+        else: 
+            tokens_list = tokens_list + _PAD
+        return tokens_list
+
+    def __len__(self):
+        return self.df.shape[0]
+
+    def select_tokens(self, tokens, max_num):
+        if len(tokens) <= max_num:
+            return tokens
+        if self.train_mode:
+            num_remove = len(tokens) - max_num
+            remove_start = np.random.randint(0, len(tokens) - num_remove - 1)
+            return tokens[:remove_start] + tokens[remove_start + num_remove:]
+        else:
+            return tokens[:max_num // 2] + tokens[-(max_num - max_num // 2):]
+
+    @staticmethod
+    def clean_text(text: str) -> str:
+        # # code in spaces
+        # text = re.sub(r"(e\.g\.| |\?|this|:|;|output)(\n{2,3}([\s\S]+?\n)\n{2})", "\1 code ", text)
+        
+        text = html.unescape(text)
+        # text = re.sub(r"\<[\s\S]+?\>", " code block ", text)
+        
+        # text = re.sub(r"((if|for)\W*\([\s\S]+?\)\W\{[\s\S]+\}|\{[\s\S]+\})", " code block ", text)
+        # text = re.sub(r"( \$[\S]+ |\$[\s\S]+?;\n)", " code ", text)
+        # text = re.sub(r"\/\/[\s\S]+?\n", " code comment ", text)
+        # text = re.sub(r"\#[\s\S]+?\n", " code comment ", text)
+        # text = re.sub(r"\/\*[\s\S]+\/\*", " code comment ", text)
+        # text = re.sub(r"\([\s\S\W]+?\)\W+\{[\s\S]+\}", " function ", text)
+
+        # latex equations
+        # text = re.sub(r" ?(\$[\s\S]+?\$|\$\$[\s\S]+?\$\$) ", " equation ", text)
+
+        return text
+
+    @staticmethod
+    def glue_title_and_question(t: str, q: str) -> str:
+        t = t.strip()
+        last_char = t[-1]
+        sep_symbol = " " if last_char in {".", ",", ":", ";", "?", "!", "-"} else ","
+        return t + sep_symbol + q
+
+    def __getitem__(self, idx):
+        index = self.df.index[idx]
+
+        if self.mode == "question":
+            title = self.df.at[index, "question_title"]
+            body = self.clean_text(self.df.at[index, "question_body"])
+            text = self.glue_title_and_question(title, body)
+        else:
+            text = self.clean_text(self.df.at[index, "answer"])
+        
+        tokens = self.tokenizer.tokenize(text)
+        tokens = self.select_tokens(tokens, MAX_LEN)
+        token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+        token_ids = self.pad_foo(token_ids, MAX_LEN, self.tokenizer.pad_token_id)
+
+        token_ids = torch.LongTensor(token_ids)
+        target = torch.FloatTensor([self.df.at[index, c] for c in self.target])
+
+        res = {
+            "sequences": token_ids,
+            "targets": target
+        }
+        return res
+
+
+class AllInSequenceDataset(TransformerFieldsDataset):
+
+    @staticmethod
+    def glue_title_and_question(t: str, q: str) -> str:
+        t = t.strip()
+        last_char = t[-1]
+        sep_symbol = " " if last_char in {".", ",", ":", ";", "?", "!", "-"} else ","
+        return t + sep_symbol + q
+
+    def build_tokens_and_segments(self, title: str, question: str, answer: str, category: str, host: str):
+        """
+        Input will be represented as: 
+        <CLS> {category tokens} <SEP> {host tokens} <SEP> {title & question tokens} <SEP> {asnwer tokens} <SEP>
+
+        With mask:
+        0 ....................................................................... 0   1 ................... 1
+        """
+        # first part of input
+        category = self.tokenizer.tokenize(category) + [self.tokenizer.sep_token]    # list of tokens (strings)
+        host = self.tokenizer.tokenize(host) + [self.tokenizer.sep_token]    # list of tokens (strings)
+        title_question = self.glue_title_and_question(title, question)  # str
+        title_body_tokens = self.tokenizer.tokenize(title_question)  # list of tokens (strings)
+        title_body_tokens = self._select_tokens(title_body_tokens, MAX_QUESTION_LEN)  # list of tokens (strings)
+        title_body_tokens_ids = self.tokenizer.convert_tokens_to_ids(title_body_tokens)  # list of integers
+        # second part of input
+        ans_tokens = self.tokenizer.tokenize(answer)  # list of tokens (strings)
+        ans_tokens = self._select_tokens(ans_tokens, MAX_ANSWER_LEN)  # list of tokens (strings)
+        ans_tokens_ids = self.tokenizer.convert_tokens_to_ids(ans_tokens)  # list of integers
+        # outputs
+        token_ids = self.tokenizer.build_inputs_with_special_tokens(title_body_tokens_ids, ans_tokens_ids)  # list of integers
+        segments = self.tokenizer.create_token_type_ids_from_sequences(title_body_tokens_ids, ans_tokens_ids)  # list of integers
+        return token_ids, segments
+
+    def __getitem__(self, idx):
+        index = self.df.index[idx]
+        title = self.df.at[index, "question_title"]
+        body = self.df.at[index, "question_body"]
+        answer = self.df.at[index, "answer"]
+        category = self.df.at[index, "category"]
+        host = self.df.at[index, "host"]
+
+        # combine fields into one sequence
+        token_ids, segments = self.build_tokens_and_segments(title, body, answer, category, host)
+        # pad sequneces if needed
+        token_ids = self._pad_foo(token_ids, MAX_LEN, self.tokenizer.pad_token_id)
+        segments = self._pad_foo(segments, MAX_LEN, self.tokenizer.pad_token_id)
+        # converting to tensors
+        token_ids = torch.LongTensor(token_ids)
+        segments = torch.LongTensor(segments) 
+        target = torch.FloatTensor([self.df.at[index, c] for c in self.target])
+        res = {
+            "sequences": token_ids, 
+            "segments": segments, 
+            "targets": target
+        }
+        return res
+
+
+class TwoSidedTransformerFieldsDataset(Dataset):
+    def __init__(self,
+                 df: DataFrame,
+                 target: List[str],
+                 tokenizer: BasicTokenizer,
+                 train_mode: bool = True,
+                 pre_pad: bool = False,
+                 **kwargs):
+        self.df: DataFrame = df
+        self.target = target
+        self.train_mode = train_mode
+        self.tokenizer = tokenizer
+        self.PAD_ID = self.tokenizer.pad_token_id
+        self.PAD_TOKEN = self.tokenizer.pad_token
+        self.pre_pad = pre_pad
+
+    def __len__(self) -> int:
+        return len(self.df)
+
+    def pad_foo(self, tokens_list, max_size, pad_value=0) -> list:
+        """
+        Arguments:
+            tokens_list - list of strings (tokens)
+            max_size - int, maximal size of sequnece
+            pad_value - str, value to use for padding, if not specified then will be used pad value from tokenizer
+            pre_pad - use padding before sequence (<pad>, ... <pad>, begin, ..., end) or after sequence (begin, ..., end, <pad>, ..., <pad>)
+        """
+        PAD = [pad_value] * (max_size - len(tokens_list)) if len(tokens_list) < max_size else []
+        tokens_list = PAD + tokens_list if self.pre_pad else tokens_list + PAD
+        return tokens_list
+    
+    def _select_tokens(self, tokens, max_num):
+        if len(tokens) <= max_num:
+            return tokens
+        if self.train_mode:
+            num_remove = len(tokens) - max_num
+            remove_start = np.random.randint(0, len(tokens) - num_remove - 1)
+            return tokens[:remove_start] + tokens[remove_start + num_remove:]
+        else:
+            return tokens[:max_num // 2] + tokens[-(max_num - max_num // 2):]
+
+    def __getitem__(self, idx: int) -> dict:
+        index = self.df.index[idx]
+        title = self.df.at[index, "question_title"]
+        body = self.df.at[index, "question_body"]
+        answer = self.df.at[index, "answer"]
+
+        title_body_tokens = self.tokenizer.tokenize(title + "," + body)
+        title_body_tokens = self._select_tokens(
+            title_body_tokens, 
+            max_num=MAX_LEN - 2
+        )
+        ans_tokens = self.tokenizer.tokenize(answer)
+        ans_tokens = self._select_tokens(
+            ans_tokens, 
+            max_num=MAX_LEN - 2
+        )
+
+        first_part = [self.tokenizer.cls_token] + title_body_tokens + [self.tokenizer.sep_token]
+        first_part_ids = self.tokenizer.convert_tokens_to_ids(first_part)
+        first_part_ids = self.pad_foo(first_part_ids, MAX_LEN, self.PAD_ID)
+
+        second_part = [self.tokenizer.cls_token] + ans_tokens + [self.tokenizer.sep_token]
+        second_part_ids = self.tokenizer.convert_tokens_to_ids(second_part)
+        second_part_ids = self.pad_foo(second_part_ids, MAX_LEN, self.PAD_ID)
+
+        first_part_ids = torch.LongTensor(first_part_ids)
+        second_part_ids = torch.LongTensor(second_part_ids)
+        target = torch.FloatTensor([self.df.at[index, c] for c in self.target])
+
+        res = {
+            "question": first_part_ids,
+            "answer": second_part_ids,
             "targets": target,
         }
         return res
@@ -651,10 +1104,6 @@ class TransformerMultipleFieldsDataset(Dataset):
         self.field = field
         self.train_mode = train_mode
         self.tokenizer: BertTokenizer = BertTokenizer.from_pretrained(tokenizer_dir)
-        self.tok2id = self.tokenizer.convert_tokens_to_ids
-
-        self.CLS = self.tokenizer.vocab["[CLS]"]
-        self.PAD = self.tokenizer.vocab["[PAD]"]
 
     def __len__(self):
         return self.df.shape[0]
@@ -665,7 +1114,7 @@ class TransformerMultipleFieldsDataset(Dataset):
         if len(tokens) > MAX_LEN - 1:
             start_idx = np.random.randint(0, len(tokens) - MAX_LEN + 1)
             tokens = tokens[start_idx:start_idx + MAX_LEN - 1]
-        tokens = ["[CLS]"] + tokens
+        tokens = [self.tokenizer.cls_token] + tokens
         # switch to integers
         ids = self.tokenizer.convert_tokens_to_ids(tokens)
         if len(ids) < MAX_LEN:
@@ -683,9 +1132,7 @@ class TransformerMultipleFieldsDataset(Dataset):
         fields["question_body"] = self._tokenize(body)
         fields["answer"] = self._tokenize(answer)
 
-        fields["targets"] = torch.FloatTensor(
-            [self.df.at[index, c] for c in self.target]
-        )
+        fields["targets"] = torch.FloatTensor([self.df.at[index, c] for c in self.target])
         return fields
 
 

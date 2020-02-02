@@ -17,6 +17,8 @@ INPUT_TYPES = {
     "transformers-categories-stats",
     "roberta-categories-stats",
     "transformers-stats",
+    "distilbert",
+    "bert-catstats-stats",
 }
 
 
@@ -44,6 +46,7 @@ def main():
         example_input = torch.randint(low=1, high=10, size=(1, 512)).to(device)
         example_input[0, 0] = 101
         example_seg = torch.randint(low=0, high=2, size=(1, 512)).to(device)
+        # 2 inputs
         model_input = (example_input, example_seg)
     elif input_type == "fields":
         example_question_title = torch.randint(low=0, high=10, size=(1, 100)).to(device)
@@ -51,6 +54,7 @@ def main():
         example_answer = torch.randint(low=0, high=10, size=(1, 250)).to(device)
         example_category = torch.randint(high=5, size=(1, 1)).to(device)
         example_host = torch.randint(high=5, size=(1, 1)).to(device)
+        # 5 inputs
         model_input = (example_question_title, example_question_body, example_answer, 
                        example_category, example_host)
     elif input_type == "transformers-categories":
@@ -59,6 +63,7 @@ def main():
         example_seg = torch.randint(low=0, high=2, size=(1, 512)).to(device)
         example_category = torch.randint(high=5, size=(1, 1)).to(device)
         example_host = torch.randint(high=5, size=(1, 1)).to(device)
+        # 4 inputs
         model_input = (example_input, example_category, example_host, example_seg)
     elif input_type == "transformers-categories-stats":
         example_input = torch.randint(low=1, high=10, size=(1, 512)).to(device)
@@ -67,21 +72,38 @@ def main():
         example_category = torch.randint(high=5, size=(1, 1)).to(device)
         example_host = torch.randint(high=5, size=(1, 1)).to(device)
         example_stats = torch.randn(1, 23).to(device)
+        # 5 inputs
         model_input = (example_input, example_category, example_host, example_stats, example_seg)
     elif input_type == "transformers-stats":
         example_input = torch.randint(low=1, high=10, size=(1, 512)).to(device)
         example_input[0, 0] = 101
         example_seg = torch.randint(low=0, high=2, size=(1, 512)).to(device)
         example_stats = torch.randn(1, 83).to(device)
+        # 3 inputs
         model_input = (example_input, example_stats, example_seg)
-    else:
-        # roberta-categories-stats
+    elif input_type == "roberta-categories-stats":
         example_input = torch.randint(low=1, high=10, size=(1, 512)).to(device)
         example_input[0, 0] = 101
         example_category = torch.randint(high=5, size=(1, 1)).to(device)
         example_host = torch.randint(high=5, size=(1, 1)).to(device)
         example_stats = torch.randn(1, 23).to(device)
+        # 4 inputs
         model_input = (example_input, example_category, example_host, example_stats)
+    elif input_type == "distilbert":
+        example_input = torch.randint(low=1, high=10, size=(1, 512)).to(device)
+        example_input[0, 0] = 101
+        # 1 input
+        model_input = (example_input,)
+    else:
+        # "bert-catstats-stats"
+        example_input = torch.randint(low=1, high=10, size=(1, 512)).to(device)
+        example_input[0, 0] = 101
+        example_seg = torch.randint(low=0, high=2, size=(1, 512)).to(device)
+        example_category = torch.randint(high=5, size=(1, 1)).to(device)
+        example_host = torch.randint(high=5, size=(1, 1)).to(device)
+        example_stats = torch.randn(1, 83).to(device)
+        # 5 inputs
+        model_input = (example_input, example_category, example_host, example_stats, example_seg)
 
     trace = torch.jit.trace(model, model_input)
     torch.jit.save(trace, out_file)

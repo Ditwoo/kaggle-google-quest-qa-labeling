@@ -13,6 +13,8 @@ from .transformers import (
     PTCFS,
     PTM,
     PTC,
+    TwoSidedPooledTransformer,
+    PCTCFS,
 )
 from .utils import (
     patch_model_with_embedding, 

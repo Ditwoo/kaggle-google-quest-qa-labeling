@@ -9,7 +9,14 @@ import torch
 import torch.nn as nn
 from catalyst.dl import ConfigExperiment
 from sklearn.model_selection import train_test_split
-from transformers import BertTokenizer, BertTokenizerFast, XLNetTokenizer, RobertaTokenizer
+from transformers import (
+    AlbertTokenizer,
+    BertTokenizer, 
+    BertTokenizerFast, 
+    DistilBertTokenizer, 
+    XLNetTokenizer, 
+    RobertaTokenizer,
+)
 
 from .datasets import (
     FieldsDataset,
@@ -25,6 +32,11 @@ from .datasets import (
     XFDCFSF,
     FoldTFDCFSF,
     FoldTFDCSF,
+    TFDCC,
+    JoinedTransformerFieldsDataset,
+    TwoSidedTransformerFieldsDataset,
+    QuestionAnswerDataset,
+    AllInSequenceDataset,
 )
 from .datasets.augmentations import (
     CombineSeqs, 
@@ -35,7 +47,7 @@ from .datasets.augmentations import (
 
 
 TEXT_COLS = ["question_title", "question_body", "answer", "category", "host"]
-TARGETS = [
+QUESTION_TARGETS = [
     "question_asker_intent_understanding", 
     "question_body_critical",
     "question_conversational",
@@ -57,6 +69,8 @@ TARGETS = [
     "question_type_reason_explanation",
     "question_type_spelling",
     "question_well_written",
+]  # 21 variables
+ANSWER_TARGETS = [
     "answer_helpful",
     "answer_level_of_information",
     "answer_plausible",
@@ -66,7 +80,13 @@ TARGETS = [
     "answer_type_procedure",
     "answer_type_reason_explanation",
     "answer_well_written",
-]
+]  # 9 variables
+TARGETS = QUESTION_TARGETS + ANSWER_TARGETS  # 30 variables
+TARGETS_ENV_MAP = {
+    "QUESTION": QUESTION_TARGETS,
+    "ANSWER": ANSWER_TARGETS,
+    "BOTH": TARGETS,
+}
 
 
 class Experiment(ConfigExperiment):
@@ -92,14 +112,13 @@ class Experiment(ConfigExperiment):
                                  train_pickle: str = None,
                                  valid_pickle: str = None,
                                  **kwargs):
-        if "STATS_CONFIG" in os.environ and os.environ["STATS_CONFIG"]:
-            stats_config = os.environ["STATS_CONFIG"]
-        else:
-            raise ValueError("There is no specified 'STATS_CONFIG' env variable!")
+        # if "STATS_CONFIG" in os.environ and os.environ["STATS_CONFIG"]:
+        #     stats_config = os.environ["STATS_CONFIG"]
+        # else:
+        #     raise ValueError("There is no specified 'STATS_CONFIG' env variable!")
             
-        
-        with open(stats_config, "r") as f:
-            stats_config = json.load(f)
+        # with open(stats_config, "r") as f:
+        #     stats_config = json.load(f)
 
         # from pprint import pprint
         # print()
@@ -109,23 +128,41 @@ class Experiment(ConfigExperiment):
         if "TRAIN_PICKLE" in os.environ and os.environ["TRAIN_PICKLE"]:
             train_pickle = os.environ["TRAIN_PICKLE"]
 
+        # if "TARGETS" in os.environ and os.environ["TARGETS"] in {"QUESTION", "ANSWER", "BOTH"}:
+        #     targets = os.environ["TARGETS"]
+        # else:
+        #     targets = "BOTH"
+
+        # if targets == "QUESTION":
+        #     dataset_mode = "question"
+        # elif targets == "ANSWER":
+        #     dataset_mode = "answer"
+        # else:
+        #     raise KeyError("Expected one of two modes - QUESTION or ANSWER !")
+
+        # targets = TARGETS_ENV_MAP.get(targets, TARGETS_ENV_MAP["BOTH"])
+        targets = TARGETS
         tokenizer_cls = BertTokenizer
-        dataset_cls = FoldTFDCSF # FoldTFDCFSF # XFDCFSF # RFDCFSF # TFDCFSF
+        dataset_cls =  AllInSequenceDataset # TFDCC # FoldTFDCSF # TransformerFieldsDataset # TwoSidedTransformerFieldsDataset #JoinedTransformerFieldsDataset # FoldTFDCSF # FoldTFDCFSF # XFDCFSF # RFDCFSF # TFDCFSF
 
         with open(train_pickle, "rb") as f:
             df = pickle.load(f)
 
-        print(f"Train shapes - {df.shape}")
+        # print(f" * Training dataset mode: '{dataset_mode}'")
+        print(f" * Targets: {', '.join(targets)}")
+
         datasets = OrderedDict()
         datasets["train"] = dict(
             dataset=dataset_cls(
-                stats_config,
+                # stats_config=stats_config,
                 df=df, 
-                target=TARGETS, 
+                target=targets, 
+                # mode=dataset_mode,
                 tokenizer=tokenizer_cls.from_pretrained(tokenizer),
             ),
             shuffle=True,
         )
+        print(" * Train size -", len(datasets["train"]["dataset"]), flush=True)
         
         if "VALID_PICKLE" in os.environ and os.environ["VALID_PICKLE"]:
             valid_pickle = os.environ["VALID_PICKLE"]
@@ -133,16 +170,17 @@ class Experiment(ConfigExperiment):
         with open(valid_pickle, "rb") as f:
             df = pickle.load(f)
 
-        print(f"Valid shapes - {df.shape}")
         datasets["valid"] = dict(
             dataset=dataset_cls(
-                stats_config,
+                # stats_config=stats_config,
                 df=df, 
-                target=TARGETS, 
+                target=targets,
+                # mode=dataset_mode,
                 tokenizer=tokenizer_cls.from_pretrained(tokenizer),
             ),
             shuffle=False,
         )
+        print(" * Valid size -", len(datasets["valid"]["dataset"]), flush=True)
         return datasets
 
     def rnn_get_datasets(self,

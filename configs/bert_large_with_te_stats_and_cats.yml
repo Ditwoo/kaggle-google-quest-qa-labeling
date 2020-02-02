@@ -1,6 +1,8 @@
 model_params:
-  model: PTC
-  pretrain_dir: bert-base-uncased
+  model: PCTCFS
+  pretrain_dir: bert-large-uncased
+  num_categories: 6
+  num_hosts: 65
   stats_dim: 83
   num_classes: 30
   pad_token: 0
@@ -15,9 +17,9 @@ stages:
     minimize_metric: False
 
   data_params:
-    num_workers: &nw 6
+    num_workers: &nw 2
     batch_size: *nw
-    tokenizer: bert-base-uncased
+    tokenizer: bert-large-uncased
 
   criterion_params:
     criterion: BCEWithLogitsLoss
@@ -29,7 +31,7 @@ stages:
 
     optim:
       callback: OptimizerCallback
-      # accumulation_steps: 16
+      accumulation_steps: 16
 
     spearman:
       callback: SpearmanScoreCallback
@@ -37,7 +39,7 @@ stages:
 
     saver:
       callback: CheckpointCallback
-
+    
     early_stopping:
       callback: EarlyStoppingCallback
       patience: 3
@@ -50,28 +52,6 @@ stages:
     
     optimizer_params:
       optimizer: Adam
-      lr: 0.00001
-
-  stage2:
-    state_params:
-      num_epochs: 5
-    
-    optimizer_params:
-      optimizer: Adam
-      lr: 0.000005
-  
-  stage3:
-    state_params:
-      num_epochs: 5
-    
-    optimizer_params:
-      optimizer: Adam
-      lr: 0.000001
-  
-  stage4:
-    state_params:
-      num_epochs: 5
-    
-    optimizer_params:
-      optimizer: Adam
-      lr: 0.0000001
+      lr: 0.00003
+      betas: &betas [0.9, 0.98]
+      eps: &eps 0.000000001

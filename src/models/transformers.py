@@ -252,7 +252,7 @@ class PTM(nn.Module):
         )
 
         self.pre_classifier = nn.Linear(
-            config.hidden_size * 2,
+            config.hidden_size * 3,
             config.hidden_size
         )
         self.classifier = nn.Sequential(
@@ -268,8 +268,6 @@ class PTM(nn.Module):
             segments  - torch.LongTensor with segment indicators
         """
 
-        # import pdb; pdb.set_trace()
-
         mask = (sequences != self.pad_token).float()
         bm_output = self.base_model(
             input_ids=sequences,
@@ -280,6 +278,7 @@ class PTM(nn.Module):
         hidden_state = bm_output[0]  # (bs, seq_len, dim)
 
         pooled_output = torch.cat([
+            hidden_state[:, 0],
             torch.max(hidden_state, 1)[0],
             torch.mean(hidden_state, 1),
         ], 1) # (bs, dim)
@@ -448,3 +447,160 @@ class PTCFS(nn.Module):
         pooled_output = self.pre_classifier(pooled_output)  # (bs, dim)
         logits = self.classifier(pooled_output)  # (bs, dim)
         return logits
+
+
+class PCTCFS(nn.Module):
+    """
+    Pooled + [CLS] token Transformer model with categorical features (category & host features) and text statistics.
+    """
+    def __init__(self,
+                 pretrain_dir: str,
+                 num_categories: int,
+                 num_hosts: int,
+                 stats_dim: int,
+                 num_classes: int = 1,
+                 pad_token: int = 0):
+        super(PCTCFS, self).__init__()
+        self.pad_token = pad_token
+        config = AutoConfig.from_pretrained(
+            pretrain_dir, 
+            num_labels=num_classes
+        )
+        if hasattr(config, "hidden_dropout_prob"):
+            dropout = config.hidden_dropout_prob
+        elif hasattr(config, "dropout"):
+            dropout = config.dropout
+        else:
+            dropout = 0.1
+
+        self.base_model = AutoModel.from_pretrained(
+            pretrain_dir, 
+            config=config
+        )
+
+        categories_emb_dim = 8
+        self.categories_emb = nn.Embedding(num_categories, categories_emb_dim)
+
+        hosts_emb_dim = 16
+        self.hosts_emb = nn.Embedding(num_hosts, hosts_emb_dim)
+
+        stats_hidden_dim = 64
+        self.stats_dense = nn.Sequential(
+            nn.Linear(stats_dim, 64),
+            nn.ReLU(True),
+        )
+
+        self.pre_classifier = nn.Linear(
+            config.hidden_size * 3 + hosts_emb_dim + categories_emb_dim + stats_hidden_dim, 
+            config.hidden_size
+        )
+        self.classifier = nn.Sequential(
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(config.hidden_size, num_classes)
+        )
+    
+    def forward(self, sequences, category, host, stats, segments=None, head_mask=None):
+        """
+        Inputs:
+            sequences - torch.LongTensor with tokens
+            category  - torch.LongTensor with 1 category for each element of batch
+            host      - torch.LongTensor with 1 host for each element of batch
+            stats     - torch.FloatTensor with values (text statistics)
+            segments  - torch.LongTensor with segment indicators
+        """
+
+        # import pdb; pdb.set_trace()
+
+        mask = (sequences != self.pad_token).float()
+        bm_output = self.base_model(
+            input_ids=sequences,
+            attention_mask=mask,
+            token_type_ids=segments,
+            # head_mask=head_mask
+        )
+        hidden_state = bm_output[0]  # (bs, seq_len, dim)
+        ctg_emb = self.categories_emb(category).squeeze(1) # (bs, dim)
+        host_emb = self.hosts_emb(host).squeeze(1) # (bs, dim)
+        stats_feats = self.stats_dense(stats) # (bs, dim)
+
+        pooled_output = torch.cat([
+            hidden_state[:, 0],  # [CLS] token always first
+            torch.max(hidden_state, 1)[0],
+            torch.mean(hidden_state, 1),
+            ctg_emb,
+            host_emb,
+            stats_feats
+        ], 1) # (bs, dim)
+        pooled_output = self.pre_classifier(pooled_output)  # (bs, dim)
+        logits = self.classifier(pooled_output)  # (bs, dim)
+        return logits
+
+
+class TwoSidedPooledTransformer(nn.Module):
+    """
+    Transformer model with poolings and two inputs - question, answer
+    """
+    def __init__(self,
+                 pretrain_dir: str,
+                 num_classes: int = 1,
+                 pad_token: int = 0):
+        super(TwoSidedPooledTransformer, self).__init__()
+        self.pad_token = pad_token
+        config = AutoConfig.from_pretrained(
+            pretrain_dir, 
+            num_labels=num_classes
+        )
+        if hasattr(config, "hidden_dropout_prob"):
+            dropout = config.hidden_dropout_prob
+        elif hasattr(config, "dropout"):
+            dropout = config.dropout
+        else:
+            dropout = 0.1
+
+        self.base_model = AutoModel.from_pretrained(
+            pretrain_dir, 
+            config=config
+        )
+
+        self.pre_classifier = nn.Linear(
+            config.hidden_size * 4, 
+            config.hidden_size
+        )
+        self.classifier = nn.Sequential(
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(config.hidden_size, num_classes)
+        )
+    
+    def forward(self, question, answer):
+        """
+        Inputs:
+            question - torch.LongTensor with tokens
+            answer   - torch.LongTensor with tokens
+        """
+
+        # import pdb; pdb.set_trace()
+
+        question_mask = (question != self.pad_token).float()
+        question_hidden_state, _ = self.base_model(
+            input_ids=question,
+            attention_mask=question_mask,
+        ) # (bs, seq_len, dim)
+
+        answer_mask = (answer != self.pad_token).float()
+        answer_hidden_state, _ = self.base_model(
+            input_ids=answer,
+            attention_mask=question_mask,
+        ) # (bs, seq_len, dim)
+
+        pooled_output = torch.cat([
+            torch.max(question_hidden_state, 1)[0],
+            torch.mean(question_hidden_state, 1),
+            torch.max(answer_hidden_state, 1)[0],
+            torch.mean(answer_hidden_state, 1),
+        ], 1) # (bs, dim)
+        pooled_output = self.pre_classifier(pooled_output)  # (bs, dim)
+        logits = self.classifier(pooled_output)  # (bs, dim)
+        return logits
+

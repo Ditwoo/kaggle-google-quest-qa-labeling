@@ -16,4 +16,9 @@ from .transformers import (
     XFDCFSF,
     FoldTFDCFSF,
     FoldTFDCSF,
+    TFDCC,
+    JoinedTransformerFieldsDataset,
+    TwoSidedTransformerFieldsDataset,
+    QuestionAnswerDataset,
+    AllInSequenceDataset,
 )

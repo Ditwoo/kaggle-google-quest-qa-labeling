@@ -1,6 +1,8 @@
 model_params:
-  model: PTC
+  model: PCTCFS
   pretrain_dir: bert-base-uncased
+  num_categories: 6
+  num_hosts: 65
   stats_dim: 83
   num_classes: 30
   pad_token: 0
@@ -50,7 +52,9 @@ stages:
     
     optimizer_params:
       optimizer: Adam
-      lr: 0.00001
+      lr: 0.00003
+      betas: &betas [0.9, 0.98]
+      eps: &eps 0.000000001
 
   stage2:
     state_params:
@@ -58,7 +62,9 @@ stages:
     
     optimizer_params:
       optimizer: Adam
-      lr: 0.000005
+      lr: 0.00001 # 0.000005
+      betas: *betas
+      eps: *eps
   
   stage3:
     state_params:
@@ -67,6 +73,8 @@ stages:
     optimizer_params:
       optimizer: Adam
       lr: 0.000001
+      betas: *betas
+      eps: *eps
   
   stage4:
     state_params:
@@ -75,3 +83,5 @@ stages:
     optimizer_params:
       optimizer: Adam
       lr: 0.0000001
+      betas: *betas
+      eps: *eps

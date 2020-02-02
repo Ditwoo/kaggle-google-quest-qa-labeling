@@ -3,6 +3,17 @@ import json
 import numpy as np
 
 
+AJAX_FUNCTION = re.compile(r"\$[A-z0-9\(\)\[\]\{\}\.\,\s\/\-\>\<\=\&\|\#\@\!\%\^\*\\\"\'\;\`]*\;")
+HTML_TAGS = re.compile(r"\&lt\;[\s\S]+?\&gt\;")
+JS_FUNCTION = re.compile(r"function[\s\S]+?\}")
+LATEX_EXPRESSION = re.compile(r"\${1,2}[\s\S]+?\${1,2}")
+JAVA_FUNCTION = re.compile(r"(public|static|protected) class[\s\S]+?\}")
+
+
+def clear_text_from_code(text: str) -> str:
+    pass
+
+
 def pad_sequences(sequences: list,
                   max_len: int,
                   value: int = 0,

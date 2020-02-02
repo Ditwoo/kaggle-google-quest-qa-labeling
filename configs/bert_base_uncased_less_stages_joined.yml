@@ -1,7 +1,6 @@
 model_params:
-  model: PTC
+  model: PTM
   pretrain_dir: bert-base-uncased
-  stats_dim: 83
   num_classes: 30
   pad_token: 0
 
@@ -43,35 +42,41 @@ stages:
       patience: 3
       metric: spearman
       minimize: False
+    
+    telegram_logger:
+      callback: TelegramLogger
+      log_on_stage_start: False
+      log_on_loader_start: False
 
   stage1:
     state_params:
       num_epochs: 10
     
     optimizer_params:
-      optimizer: Adam
+      optimizer: RAdam
       lr: 0.00001
+      betas: &betas [0.9, 0.98]
+      eps: &eps 0.000000001
+      # weight_decay: &wd 0.001
 
   stage2:
     state_params:
       num_epochs: 5
     
     optimizer_params:
-      optimizer: Adam
-      lr: 0.000005
-  
+      optimizer: RAdam
+      lr: 0.000001
+      betas: *betas
+      # eps: *eps
+      # weight_decay: *wd
+
   stage3:
     state_params:
       num_epochs: 5
     
     optimizer_params:
-      optimizer: Adam
-      lr: 0.000001
-  
-  stage4:
-    state_params:
-      num_epochs: 5
-    
-    optimizer_params:
-      optimizer: Adam
+      optimizer: RAdam
       lr: 0.0000001
+      betas: *betas
+      eps: *eps
+      # weight_decay: *wd
