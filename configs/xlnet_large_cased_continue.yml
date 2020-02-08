@@ -1,12 +1,11 @@
 model_params:
-  model: PTM
-  pretrain_dir: bert-base-uncased
-  num_classes: 30
-  pad_token: 0
-
-# distributed_params:
-#   opt_level: O1
-#   syncbn: True
+  model: model_from_checkpoint
+  checkpoint: BEST_STATE
+  params:
+    model: PTM
+    pretrain_dir: xlnet-large-cased
+    num_classes: 30
+    pad_token: 5
 
 stages:
   state_params:
@@ -14,9 +13,9 @@ stages:
     minimize_metric: False
 
   data_params:
-    num_workers: &nw 6
+    num_workers: &nw 1
     batch_size: *nw
-    tokenizer: bert-base-uncased
+    tokenizer: xlnet-large-cased
 
   criterion_params:
     criterion: BCEWithLogitsLoss
@@ -28,7 +27,7 @@ stages:
 
     optim:
       callback: OptimizerCallback
-      # accumulation_steps: 16
+      accumulation_steps: 32
 
     spearman:
       callback: SpearmanScoreCallback
@@ -36,13 +35,13 @@ stages:
 
     saver:
       callback: CheckpointCallback
-
+    
     early_stopping:
       callback: EarlyStoppingCallback
       patience: 2
       metric: spearman
       minimize: False
-    
+
     telegram_logger:
       callback: TelegramLogger
       log_on_stage_start: False
@@ -56,30 +55,5 @@ stages:
       num_epochs: 10
     
     optimizer_params:
-      optimizer: RAdam
-      lr: 0.00001
-      betas: &betas [0.9, 0.98]
-      eps: &eps 0.000000001
-      # weight_decay: &wd 0.001
-
-  stage2:
-    state_params:
-      num_epochs: 5
-    
-    optimizer_params:
-      optimizer: RAdam
-      lr: 0.000001
-      betas: *betas
-      # eps: *eps
-      # weight_decay: *wd
-
-  stage3:
-    state_params:
-      num_epochs: 5
-    
-    optimizer_params:
-      optimizer: RAdam
-      lr: 0.0000001
-      betas: *betas
-      eps: *eps
-      # weight_decay: *wd
+      optimizer: Adam
+      lr: 0.000005

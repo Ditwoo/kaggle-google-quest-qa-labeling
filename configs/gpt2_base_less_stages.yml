@@ -1,8 +1,8 @@
 model_params:
   model: PTM
-  pretrain_dir: bert-base-uncased
+  pretrain_dir: gpt2
   num_classes: 30
-  pad_token: 0
+  pad_token: 5
 
 # distributed_params:
 #   opt_level: O1
@@ -16,7 +16,7 @@ stages:
   data_params:
     num_workers: &nw 6
     batch_size: *nw
-    tokenizer: bert-base-uncased
+    tokenizer: gpt2
 
   criterion_params:
     criterion: BCEWithLogitsLoss
@@ -47,9 +47,6 @@ stages:
       callback: TelegramLogger
       log_on_stage_start: False
       log_on_loader_start: False
-      metric_names:
-        - loss
-        - spearman
 
   stage1:
     state_params:

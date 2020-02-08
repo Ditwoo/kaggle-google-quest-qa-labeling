@@ -1,8 +1,8 @@
 model_params:
   model: PTM
-  pretrain_dir: bert-base-uncased
+  pretrain_dir: xlnet-base-cased
   num_classes: 30
-  pad_token: 0
+  pad_token: 5
 
 # distributed_params:
 #   opt_level: O1
@@ -16,7 +16,7 @@ stages:
   data_params:
     num_workers: &nw 6
     batch_size: *nw
-    tokenizer: bert-base-uncased
+    tokenizer: xlnet-base-cased
 
   criterion_params:
     criterion: BCEWithLogitsLoss

@@ -16,6 +16,7 @@ from transformers import (
     DistilBertTokenizer, 
     XLNetTokenizer, 
     RobertaTokenizer,
+    GPT2Tokenizer,
 )
 
 from .datasets import (
@@ -37,6 +38,9 @@ from .datasets import (
     TwoSidedTransformerFieldsDataset,
     QuestionAnswerDataset,
     AllInSequenceDataset,
+    BertDataset,
+    XLNetDataset,
+    GPT2Dataset,
 )
 from .datasets.augmentations import (
     CombineSeqs, 
@@ -142,8 +146,8 @@ class Experiment(ConfigExperiment):
 
         # targets = TARGETS_ENV_MAP.get(targets, TARGETS_ENV_MAP["BOTH"])
         targets = TARGETS
-        tokenizer_cls = BertTokenizer
-        dataset_cls =  AllInSequenceDataset # TFDCC # FoldTFDCSF # TransformerFieldsDataset # TwoSidedTransformerFieldsDataset #JoinedTransformerFieldsDataset # FoldTFDCSF # FoldTFDCFSF # XFDCFSF # RFDCFSF # TFDCFSF
+        tokenizer_cls = XLNetTokenizer
+        dataset_cls =  XLNetDataset #AllInSequenceDataset # TFDCC # FoldTFDCSF # TransformerFieldsDataset # TwoSidedTransformerFieldsDataset #JoinedTransformerFieldsDataset # FoldTFDCSF # FoldTFDCFSF # XFDCFSF # RFDCFSF # TFDCFSF
 
         with open(train_pickle, "rb") as f:
             df = pickle.load(f)
@@ -156,7 +160,7 @@ class Experiment(ConfigExperiment):
             dataset=dataset_cls(
                 # stats_config=stats_config,
                 df=df, 
-                target=targets, 
+                target=targets,
                 # mode=dataset_mode,
                 tokenizer=tokenizer_cls.from_pretrained(tokenizer),
             ),

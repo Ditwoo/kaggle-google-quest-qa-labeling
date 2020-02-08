@@ -21,4 +21,7 @@ from .transformers import (
     TwoSidedTransformerFieldsDataset,
     QuestionAnswerDataset,
     AllInSequenceDataset,
+    BertDataset,
+    XLNetDataset,
+    GPT2Dataset,
 )
