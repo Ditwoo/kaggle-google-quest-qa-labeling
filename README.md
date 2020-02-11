@@ -1,7 +1,7 @@
 # [Kaggle Google QUEST Q&A Labeling](https://www.kaggle.com/c/google-quest-challenge/overview/notebooks-requirements)
 
 
-<img src=".readme/bronze.png" style="width:15px;"> <font size="+2"> 110/1571 Place (top 8%) </font> <img src=".readme/bronze.png" style="width:15px;"> </h2>
+<img src=".readme/bronze.png" width="15px"> <bold> 110/1571 Place (top 8%) </bold> <img src=".readme/bronze.png" width="15px"> </h2>
 
 
 ## Training & Tracing
