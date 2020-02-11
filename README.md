@@ -6,7 +6,7 @@
 
 ## Training & Tracing
 
-Firstly need to generate data, the best approach was split with [GroupKFold](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GroupKFold.html) here are examples [1](notebooks/transformer_splits.ipynb), [2](notebooks/transformer_splits_7_folds.ipynb), [3](notebooks/transformer_splits_7_folds.ipynb).
+Firstly need to generate data, the best approach was split with [GroupKFold](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GroupKFold.html) here are examples [1](notebooks/transformer_splits.ipynb), [2](notebooks/transformer_splits_7_folds.ipynb), [3](notebooks/transformer_splits_5_folds.ipynb).
 
 I suggest to create bash file with content like this:
 
